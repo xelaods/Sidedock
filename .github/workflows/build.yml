@@ -31,6 +31,14 @@ jobs:
       - name: Build installer
         run: npx tauri build
 
+      # 同梱アドオンがフォルダごと入っているか確かめる（manifest.json が 4 つあるはず）
+      - name: Check bundled add-ons
+        shell: pwsh
+        run: |
+          $m = Get-ChildItem -Recurse -Filter manifest.json src-tauri/target/release/addons
+          $m | ForEach-Object { $_.FullName }
+          if ($m.Count -lt 4) { throw "同梱アドオンが見つかりません" }
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:

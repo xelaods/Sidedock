@@ -45,7 +45,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../addons/**/*": "addons/"
+      "../addons/": "addons/"
     },
     "shortDescription": "画面上部に常駐するランチャー",
     "windows": {
