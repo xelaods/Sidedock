@@ -102,7 +102,10 @@ fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Result
 /// UI 側からのログ（起動・出し入れ・エラー）
 #[tauri::command]
 fn log_ui(app: AppHandle, message: String) {
-    log::write(&app, &format!("UI: {}", message.chars().take(500).collect::<String>()));
+    log::write(
+        &app,
+        &format!("UI: {}", message.chars().take(500).collect::<String>()),
+    );
 }
 
 /// カーソルを受け取る範囲（カプセルと開いているパネル）
@@ -298,7 +301,10 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             log::reset(&handle);
-            log::write(&handle, &format!("SideDock {} を起動", env!("CARGO_PKG_VERSION")));
+            log::write(
+                &handle,
+                &format!("SideDock {} を起動", env!("CARGO_PKG_VERSION")),
+            );
             app.manage(AppState {
                 config: Mutex::new(config::load(&handle)),
                 addons: RwLock::new(HashMap::new()),

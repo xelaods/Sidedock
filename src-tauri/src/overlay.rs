@@ -117,18 +117,16 @@ pub fn layout(app: &AppHandle) -> bool {
     true
 }
 
-/// 前面に出さずに表示する（フォーカスを奪わない）
+/// 表示する。
+/// ※ 必ず Tauri の show() を使う。Win32 の ShowWindow で直接出すと、Tauri（tao）が
+///   「まだ隠れている」と思い込み、クリック透過を切り替えるたびにウィンドウを隠し直してしまう。
+///   tauri.conf.json の focus: false により、tao はフォーカスを奪わない SW_SHOWNOACTIVATE で出す。
 pub fn show(app: &AppHandle) {
     let Some(win) = app.get_webview_window("main") else {
         return;
     };
-    #[cfg(windows)]
-    if let Ok(h) = win.hwnd() {
-        let raw = h.0 as isize;
-        let _ = app.run_on_main_thread(move || win::show_no_activate(raw));
-        return;
-    }
     let _ = win.show();
+    let _ = win.set_always_on_top(true);
 }
 
 fn hide(app: &AppHandle) {
@@ -185,7 +183,11 @@ pub fn start(app: AppHandle) {
                         &app,
                         &format!(
                             "{}: {}",
-                            if fullscreen { "全画面を検出したので隠す" } else { "全画面が終わったので表示" },
+                            if fullscreen {
+                                "全画面を検出したので隠す"
+                            } else {
+                                "全画面が終わったので表示"
+                            },
                             win::describe_foreground()
                         ),
                     );
@@ -263,9 +265,8 @@ mod win {
             WindowsAndMessaging::{
                 GetClassNameW, GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextW,
                 GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed,
-                SetForegroundWindow,
-                SetWindowPos, ShowWindow, GWL_STYLE, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE,
-                SWP_NOSIZE, SW_SHOWNOACTIVATE, WS_CAPTION,
+                SetForegroundWindow, SetWindowPos, GWL_STYLE, HWND_TOPMOST, SWP_NOACTIVATE,
+                SWP_NOMOVE, SWP_NOSIZE, WS_CAPTION,
             },
         },
     };
@@ -389,13 +390,6 @@ mod win {
             let m = mi.rcMonitor;
             r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom
         }
-    }
-
-    pub fn show_no_activate(own: isize) {
-        unsafe {
-            let _ = ShowWindow(hwnd(own), SW_SHOWNOACTIVATE);
-        }
-        keep_topmost(own);
     }
 
     pub fn keep_topmost(own: isize) {

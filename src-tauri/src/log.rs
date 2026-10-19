@@ -21,7 +21,10 @@ pub fn reset(app: &AppHandle) {
 pub fn write(app: &AppHandle, msg: &str) {
     let Some(p) = path(app) else { return };
     let _guard = LOCK.lock();
-    if std::fs::metadata(&p).map(|m| m.len() > 512 * 1024).unwrap_or(false) {
+    if std::fs::metadata(&p)
+        .map(|m| m.len() > 512 * 1024)
+        .unwrap_or(false)
+    {
         let _ = std::fs::write(&p, "");
     }
     let secs = SystemTime::now()
