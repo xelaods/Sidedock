@@ -1,5 +1,6 @@
 mod addons;
 mod config;
+mod log;
 mod overlay;
 mod system;
 
@@ -96,6 +97,12 @@ fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Result
     *state.config.lock().unwrap() = config.clone();
     let _ = app.emit("config-changed", &config);
     Ok(config)
+}
+
+/// UI 側からのログ（起動・出し入れ・エラー）
+#[tauri::command]
+fn log_ui(app: AppHandle, message: String) {
+    log::write(&app, &format!("UI: {}", message.chars().take(500).collect::<String>()));
 }
 
 /// カーソルを受け取る範囲（カプセルと開いているパネル）
@@ -225,10 +232,11 @@ fn volume_set_mute(muted: bool) -> Result<(), String> {
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let settings = MenuItem::with_id(app, "settings", "設定", true, None::<&str>)?;
     let folder = MenuItem::with_id(app, "folder", "アドオンフォルダを開く", true, None::<&str>)?;
+    let logs = MenuItem::with_id(app, "log", "診断ログを開く", true, None::<&str>)?;
     let reload = MenuItem::with_id(app, "reload", "再読み込み", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "終了", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&settings, &folder, &reload, &sep, &quit])?;
+    let menu = Menu::with_items(app, &[&settings, &folder, &logs, &reload, &sep, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id("main")
         .tooltip("SideDock")
@@ -240,6 +248,11 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             }
             "folder" => {
                 let _ = open_addons_folder(app.clone());
+            }
+            "log" => {
+                if let Some(p) = log::path(app) {
+                    let _ = system::launch(&p.to_string_lossy(), None);
+                }
             }
             "reload" => {
                 if let Some(w) = main_window(app) {
@@ -284,6 +297,8 @@ pub fn run() {
         })
         .setup(|app| {
             let handle = app.handle().clone();
+            log::reset(&handle);
+            log::write(&handle, &format!("SideDock {} を起動", env!("CARGO_PKG_VERSION")));
             app.manage(AppState {
                 config: Mutex::new(config::load(&handle)),
                 addons: RwLock::new(HashMap::new()),
@@ -306,6 +321,7 @@ pub fn run() {
             init,
             save_config,
             set_hit_rects,
+            log_ui,
             take_focus,
             release_focus,
             open_addons_folder,

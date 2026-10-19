@@ -107,6 +107,13 @@ pub fn layout(app: &AppHandle) -> bool {
     drop(g);
     let _ = win.set_size(PhysicalSize::new(next.w, next.h));
     let _ = win.set_position(PhysicalPosition::new(next.x, next.y));
+    crate::log::write(
+        app,
+        &format!(
+            "配置: x={} y={} w={} h={} 拡大率={}",
+            next.x, next.y, next.w, next.h, next.scale
+        ),
+    );
     true
 }
 
@@ -174,6 +181,14 @@ pub fn start(app: AppHandle) {
                 let fullscreen = win::fullscreen_on_same_monitor(own);
                 let was = ov.suspended.swap(fullscreen, Ordering::SeqCst);
                 if fullscreen != was {
+                    crate::log::write(
+                        &app,
+                        &format!(
+                            "{}: {}",
+                            if fullscreen { "全画面を検出したので隠す" } else { "全画面が終わったので表示" },
+                            win::describe_foreground()
+                        ),
+                    );
                     let _ = app.emit_to("main", "suspend", fullscreen);
                     if fullscreen {
                         let _ = win.set_ignore_cursor_events(true);
@@ -235,6 +250,7 @@ pub fn start(app: AppHandle) {
 mod win {
     use windows::Win32::{
         Foundation::{HWND, RECT},
+        Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED},
         Graphics::Gdi::{
             GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONULL,
             MONITOR_DEFAULTTOPRIMARY,
@@ -245,8 +261,9 @@ mod win {
                 SHQueryUserNotificationState, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN,
             },
             WindowsAndMessaging::{
-                GetClassNameW, GetForegroundWindow, GetWindowLongW, GetWindowRect,
-                GetWindowThreadProcessId, IsWindow, IsWindowVisible, SetForegroundWindow,
+                GetClassNameW, GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextW,
+                GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed,
+                SetForegroundWindow,
                 SetWindowPos, ShowWindow, GWL_STYLE, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE,
                 SWP_NOSIZE, SW_SHOWNOACTIVATE, WS_CAPTION,
             },
@@ -265,11 +282,8 @@ mod win {
 
     /// デスクトップやタスクバーなど、全画面の判定から外すウィンドウ
     fn is_shell_window(h: HWND) -> bool {
-        let mut buf = [0u16; 64];
-        let n = unsafe { GetClassNameW(h, &mut buf) };
-        let name = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
         matches!(
-            name.as_str(),
+            class_name(h).as_str(),
             "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd"
         )
     }
@@ -282,6 +296,54 @@ mod win {
         } else {
             fg.0 as isize
         }
+    }
+
+    /// 他の仮想デスクトップにある・一時停止中のストアアプリなど、見えていないウィンドウ
+    fn is_cloaked(h: HWND) -> bool {
+        let mut cloaked = 0u32;
+        unsafe {
+            DwmGetWindowAttribute(
+                h,
+                DWMWA_CLOAKED,
+                &mut cloaked as *mut u32 as *mut _,
+                std::mem::size_of::<u32>() as u32,
+            )
+            .is_ok()
+                && cloaked != 0
+        }
+    }
+
+    fn class_name(h: HWND) -> String {
+        let mut buf = [0u16; 128];
+        let n = unsafe { GetClassNameW(h, &mut buf) };
+        String::from_utf16_lossy(&buf[..n.max(0) as usize])
+    }
+
+    fn title(h: HWND) -> String {
+        let mut buf = [0u16; 128];
+        let n = unsafe { GetWindowTextW(h, &mut buf) };
+        String::from_utf16_lossy(&buf[..n.max(0) as usize])
+    }
+
+    /// ログ用：前面のウィンドウの説明
+    pub fn describe_foreground() -> String {
+        let fg = unsafe { GetForegroundWindow() };
+        if fg.is_invalid() {
+            return "(なし)".into();
+        }
+        let mut r = RECT::default();
+        let _ = unsafe { GetWindowRect(fg, &mut r) };
+        let zoomed = unsafe { IsZoomed(fg).as_bool() };
+        format!(
+            "class={} title={:?} rect=({},{})-({},{}) maximized={}",
+            class_name(fg),
+            title(fg),
+            r.left,
+            r.top,
+            r.right,
+            r.bottom,
+            zoomed
+        )
     }
 
     /// 自分と同じディスプレイで、全画面のアプリが前面にあるか
@@ -298,16 +360,22 @@ mod win {
                 || !IsWindowVisible(fg).as_bool()
                 || is_own_process(fg)
                 || is_shell_window(fg)
+                || is_cloaked(fg)
             {
+                return false;
+            }
+            // 最大化しているだけのウィンドウは全画面ではない。
+            // （タスクバーを自動で隠す設定だと、最大化でも画面全体を覆うので見分けが要る）
+            if IsZoomed(fg).as_bool() || IsIconic(fg).as_bool() {
+                return false;
+            }
+            // タイトルバーのある普通のウィンドウも除く
+            let style = GetWindowLongW(fg, GWL_STYLE) as u32;
+            if style & WS_CAPTION.0 == WS_CAPTION.0 {
                 return false;
             }
             let mon = MonitorFromWindow(fg, MONITOR_DEFAULTTONULL);
             if mon.is_invalid() || mon != MonitorFromWindow(hwnd(own), MONITOR_DEFAULTTOPRIMARY) {
-                return false;
-            }
-            // タイトルバーのある普通の最大化ウィンドウは除く（タスクバー自動非表示のときの誤判定対策）
-            let style = GetWindowLongW(fg, GWL_STYLE) as u32;
-            if style & WS_CAPTION.0 == WS_CAPTION.0 {
                 return false;
             }
             let mut mi = MONITORINFO {

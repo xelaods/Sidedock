@@ -13,6 +13,10 @@ const el = (tag, props = {}, ...children) => {
   return node;
 };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+/** 診断ログ（トレイの「診断ログを開く」で見られる） */
+const log = (msg) => invoke("log_ui", { message: String(msg) }).catch(() => {});
+addEventListener("error", (e) => log(`エラー: ${e.message} (${e.filename}:${e.lineno})`));
+addEventListener("unhandledrejection", (e) => log(`エラー: ${e.reason?.message ?? e.reason}`));
 
 // 近づいたときの反応。h：上端から何 px で反応するか、spread：カプセルの左右に広げる幅、dwell：とどまる時間
 const TRIGGERS = {
@@ -181,6 +185,7 @@ function reveal({ pinned = false } = {}) {
   clearTimer("hide");
   if (state.phase === "shown") return;
   state.phase = "shown";
+  log("出てきた");
   document.body.classList.remove("settled");
   document.body.classList.add("is-shown");
   clearTimer("settle");
@@ -195,6 +200,7 @@ function conceal() {
   closePanel();
   hideHint();
   state.phase = "hidden";
+  log("引っ込んだ");
   state.pinned = false;
   clearTimer("settle");
   setHover(null);
@@ -244,6 +250,11 @@ function updateSpot(p) {
 
 /** Rust 側から約 60 回/秒で届くカーソルの位置（離れたら null） */
 function onCursor(p) {
+  if (!state.gotCursor && p) {
+    state.gotCursor = true;
+    const c = capsuleRect();
+    log(`カーソルの位置を受信: (${p.x}, ${p.y}) カプセル: x=${c.x} y=${c.y} w=${c.w} h=${c.h} 画面幅=${innerWidth}`);
+  }
   state.cursor = p;
   if (state.suspended) return;
   if (state.phase === "hidden") {
@@ -271,6 +282,7 @@ function onCursor(p) {
 }
 
 function onSuspend(on) {
+  if (on !== state.suspended) log(on ? "全画面のため無効" : "有効に戻った");
   state.suspended = on;
   document.body.classList.toggle("is-suspended", on);
   if (on) {
@@ -834,6 +846,8 @@ async function start() {
 
   applyTheme();
   renderBar();
+  log(`UI を起動: アドオン ${data.addons.length} 個、全画面中=${data.suspended}、画面 ${innerWidth}×${innerHeight}、エラー ${data.errors.length} 件`);
+  for (const e of data.errors) log(`アドオンの読み込みエラー: ${e}`);
   onSuspend(!!data.suspended);
 
   const gear = $("#gear");
@@ -887,5 +901,6 @@ async function start() {
 }
 
 start().catch((err) => {
+  log(`起動に失敗: ${err?.message ?? err}`);
   document.body.textContent = `起動に失敗しました: ${err}`;
 });
