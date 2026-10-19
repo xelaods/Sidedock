@@ -1,36 +1,41 @@
 /*
  * SideDock アドオン用の基本スタイル。本体と同じ配色・文字・部品が使えます。
  * 色は CSS 変数（--sd-*）で参照してください。ライト/ダークは自動で切り替わります。
+ * アドオンは本体のガラスの上に透けて重なるので、面の色は半透明になっています。
  */
 :root {
-  color-scheme: light;
-  --sd-ink: #1a1c1f;
-  --sd-ink-2: #5e6670;
-  --sd-ink-3: #8a919a;
-  --sd-surface: #ffffff;
-  --sd-surface-2: #eef0f3;
-  --sd-line: rgba(26, 28, 31, 0.1);
-  --sd-hover: rgba(26, 28, 31, 0.06);
-  --sd-press: rgba(26, 28, 31, 0.1);
-  --sd-accent: #0f6cbd;
-  --sd-accent-ink: #ffffff;
-  --sd-danger: #c42b1c;
-  --sd-radius: 6px;
-  --sd-font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
-}
-:root[data-theme="dark"] {
   color-scheme: dark;
-  --sd-ink: #f2f3f5;
-  --sd-ink-2: #a3a9b1;
-  --sd-ink-3: #767d86;
-  --sd-surface: #2f3237;
-  --sd-surface-2: #1c1e21;
-  --sd-line: rgba(242, 243, 245, 0.1);
-  --sd-hover: rgba(242, 243, 245, 0.07);
-  --sd-press: rgba(242, 243, 245, 0.12);
-  --sd-accent: #6cb8f6;
-  --sd-accent-ink: #0b1a28;
-  --sd-danger: #ff99a4;
+  --sd-ink: #f3f4f6;
+  --sd-ink-2: rgba(243, 244, 246, 0.62);
+  --sd-ink-3: rgba(243, 244, 246, 0.36);
+  --sd-surface: rgba(255, 255, 255, 0.06);
+  --sd-surface-2: rgba(255, 255, 255, 0.035);
+  --sd-line: rgba(255, 255, 255, 0.08);
+  --sd-hover: rgba(255, 255, 255, 0.075);
+  --sd-press: rgba(255, 255, 255, 0.12);
+  --sd-accent: #8cc8ff;
+  --sd-accent-ink: #06121f;
+  --sd-glow: rgba(140, 200, 255, 0.45);
+  --sd-danger: #ff9aa2;
+  --sd-radius: 10px;
+  --sd-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --sd-font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+  --sd-font-display: "Segoe UI Variable Display", "Segoe UI", "Yu Gothic UI", system-ui, sans-serif;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --sd-ink: #14161a;
+  --sd-ink-2: rgba(20, 22, 26, 0.6);
+  --sd-ink-3: rgba(20, 22, 26, 0.38);
+  --sd-surface: rgba(0, 0, 0, 0.045);
+  --sd-surface-2: rgba(0, 0, 0, 0.03);
+  --sd-line: rgba(0, 0, 0, 0.08);
+  --sd-hover: rgba(0, 0, 0, 0.055);
+  --sd-press: rgba(0, 0, 0, 0.09);
+  --sd-accent: #0a66c2;
+  --sd-accent-ink: #ffffff;
+  --sd-glow: rgba(10, 102, 194, 0.3);
+  --sd-danger: #c42b1c;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -38,66 +43,103 @@ html, body {
   margin: 0;
   background: transparent;
   color: var(--sd-ink);
-  font: 14px/1.5 var(--sd-font);
+  font: 13px/1.5 var(--sd-font);
   -webkit-font-smoothing: antialiased;
   user-select: none;
+  overflow: hidden;
 }
-:root[data-slot="panel"] body { padding: 4px 16px 16px; }
-:root[data-slot="bar"] body { padding: 0; overflow: hidden; }
+/* バー：高さ 32px の横並び。幅は中身に合わせて本体が自動で調整する */
+:root[data-slot="bar"] body {
+  display: flex; align-items: center; gap: 2px;
+  width: max-content; height: 32px;
+  white-space: nowrap;
+}
+/* パネル：高さは中身に合わせて本体が自動で調整する */
+:root[data-slot="panel"] body { padding: 14px; }
 
+:focus { outline: none; }
 :focus-visible { outline: 2px solid var(--sd-accent); outline-offset: 1px; }
 
 /* ボタン */
 .sd-btn {
   appearance: none;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 32px; padding: 0 12px;
-  border: 1px solid var(--sd-line); border-radius: var(--sd-radius);
+  min-height: 30px; padding: 0 12px;
+  border: 0; border-radius: var(--sd-radius);
   background: var(--sd-surface); color: var(--sd-ink);
-  font: inherit; font-size: 13px; cursor: default;
+  box-shadow: inset 0 0 0 1px var(--sd-line);
+  font: inherit; font-size: 12.5px; cursor: default;
+  transition: background 0.18s, box-shadow 0.18s, transform 0.18s var(--sd-ease);
 }
-.sd-btn:hover { background: color-mix(in srgb, var(--sd-surface) 88%, var(--sd-ink)); }
-.sd-btn:active { background: color-mix(in srgb, var(--sd-surface) 80%, var(--sd-ink)); }
-.sd-btn:disabled { opacity: 0.45; }
-.sd-btn.primary { background: var(--sd-accent); border-color: transparent; color: var(--sd-accent-ink); }
-.sd-btn.primary:hover { background: color-mix(in srgb, var(--sd-accent) 90%, var(--sd-surface)); }
-.sd-btn.ghost { background: transparent; border-color: transparent; }
+.sd-btn:hover { background: var(--sd-hover); }
+.sd-btn:active { background: var(--sd-press); transform: scale(0.97); }
+.sd-btn:disabled { opacity: 0.4; pointer-events: none; }
+.sd-btn.primary {
+  background: var(--sd-accent); color: var(--sd-accent-ink);
+  box-shadow: 0 4px 14px -6px var(--sd-glow);
+  font-weight: 600;
+}
+.sd-btn.primary:hover { background: color-mix(in srgb, var(--sd-accent) 88%, white); }
+.sd-btn.ghost { background: transparent; box-shadow: none; }
 .sd-btn.ghost:hover { background: var(--sd-hover); }
-.sd-btn.icon { width: 32px; padding: 0; }
+.sd-btn.icon { width: 30px; padding: 0; }
 
 /* 入力欄 */
 .sd-input, .sd-select {
-  width: 100%; min-height: 34px; padding: 0 10px;
-  border: 1px solid var(--sd-line); border-bottom-color: color-mix(in srgb, var(--sd-ink) 35%, transparent);
-  border-radius: var(--sd-radius);
+  width: 100%; min-height: 34px; padding: 0 12px;
+  border: 0; border-radius: var(--sd-radius);
   background: var(--sd-surface); color: var(--sd-ink);
+  box-shadow: inset 0 0 0 1px var(--sd-line);
   font: inherit; user-select: text;
+  transition: box-shadow 0.2s, background 0.2s;
 }
+.sd-input::placeholder { color: var(--sd-ink-3); }
 .sd-input:focus, .sd-select:focus {
   outline: none;
-  border-bottom: 2px solid var(--sd-accent);
+  background: color-mix(in srgb, var(--sd-surface) 60%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sd-accent) 70%, transparent), 0 0 0 4px color-mix(in srgb, var(--sd-accent) 16%, transparent);
 }
+.sd-select option { background: #1d1f24; color: #f3f4f6; }
+:root[data-theme="light"] .sd-select option { background: #fff; color: #14161a; }
 
 /* 見出しと補足 */
-.sd-label { display: block; margin: 14px 0 6px; font-size: 12px; color: var(--sd-ink-2); }
+.sd-label { display: block; margin: 12px 0 6px; font-size: 11.5px; color: var(--sd-ink-2); }
 .sd-muted { color: var(--sd-ink-2); font-size: 12px; }
-.sd-empty { padding: 24px 8px; text-align: center; color: var(--sd-ink-2); font-size: 13px; }
+.sd-empty { padding: 18px 8px; text-align: center; color: var(--sd-ink-2); font-size: 12.5px; }
 
-/* スライダー */
-.sd-range { width: 100%; accent-color: var(--sd-accent); }
+/* スライダー。塗りの位置は --v（SDK が自動で更新する） */
+.sd-range {
+  --v: 50%;
+  appearance: none; -webkit-appearance: none;
+  width: 100%; height: 20px; margin: 0; background: transparent;
+}
+.sd-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--sd-accent) 0 var(--v), var(--sd-line) var(--v) 100%);
+}
+.sd-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px; margin-top: -5px; border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sd-accent) 22%, transparent), 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s var(--sd-ease);
+}
+.sd-range:hover::-webkit-slider-thumb, .sd-range:active::-webkit-slider-thumb { transform: scale(1.18); }
 
-/* バーに置くボタン（40×40） */
+/* バーに置く丸いボタン（32×32） */
 .sd-bar-btn {
   appearance: none; position: relative;
   display: grid; place-items: center;
-  width: 40px; height: 40px; margin: 2px auto;
-  border: 0; border-radius: var(--sd-radius);
+  width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: 16px;
   background: transparent; color: var(--sd-ink);
   font: inherit; cursor: default;
+  transition: background 0.2s, transform 0.28s var(--sd-ease);
 }
-.sd-bar-btn:hover { background: var(--sd-hover); }
-.sd-bar-btn:active { background: var(--sd-press); }
-.sd-bar-btn img { width: 26px; height: 26px; pointer-events: none; }
+.sd-bar-btn:hover { background: var(--sd-hover); transform: translateY(1px) scale(1.06); }
+.sd-bar-btn:active { background: var(--sd-press); transform: scale(0.94); transition-duration: 0.08s; }
+.sd-bar-btn img { width: 20px; height: 20px; pointer-events: none; -webkit-user-drag: none; }
+.sd-bar-btn svg { pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }

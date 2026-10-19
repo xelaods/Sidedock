@@ -1,10 +1,16 @@
 {
   "id": "sidedock.search",
   "name": "検索",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "選んだブラウザと検索エンジンで検索します",
   "author": "SideDock",
   "icon": "icon.svg",
-  "panel": { "entry": "panel.html", "title": "検索", "width": 380 },
-  "permissions": ["browser"]
+  "panel": {
+    "entry": "panel.html",
+    "title": "検索",
+    "width": 356
+  },
+  "permissions": [
+    "browser"
+  ]
 }

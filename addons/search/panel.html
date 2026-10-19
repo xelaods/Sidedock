@@ -5,40 +5,55 @@
 <link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
 <script src="http://addon.localhost/_sdk/sidedock.js"></script>
 <style>
-  form { margin-top: 4px; }
+  body { padding: 12px; }
   .box { position: relative; }
-  .box svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--sd-ink-3); pointer-events: none; }
-  #q { min-height: 40px; padding-left: 34px; font-size: 15px; }
+  .box svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--sd-ink-3); pointer-events: none; transition: color 0.2s; }
+  .box:focus-within svg { color: var(--sd-accent); }
+  #q { min-height: 38px; padding-left: 34px; font-size: 14px; border-radius: 12px; }
+  #q::-webkit-search-cancel-button { display: none; }
 
-  .engines { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+  .engines { display: flex; flex-wrap: nowrap; gap: 3px; flex: 1; }
   .engines button {
-    appearance: none; font: inherit; font-size: 12.5px;
-    padding: 3px 10px; border-radius: 14px; cursor: default;
-    border: 1px solid var(--sd-line); background: transparent; color: var(--sd-ink-2);
+    appearance: none; font: inherit; font-size: 11px; line-height: 20px;
+    flex: none; padding: 0 7px; border-radius: 10px; cursor: default;
+    border: 0; background: transparent; color: var(--sd-ink-3);
+    box-shadow: inset 0 0 0 1px var(--sd-line);
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
   }
-  .engines button:hover { background: var(--sd-hover); color: var(--sd-ink); }
-  .engines button[aria-pressed="true"] { background: var(--sd-accent); border-color: transparent; color: var(--sd-accent-ink); }
+  .engines button:hover { color: var(--sd-ink); background: var(--sd-hover); }
+  .engines button[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--sd-accent) 18%, transparent);
+    color: var(--sd-accent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sd-accent) 40%, transparent);
+  }
+  .foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .foot label { flex: none; font-size: 11px; color: var(--sd-ink-3); }
+  #browser { min-height: 26px; font-size: 11.5px; padding: 0 8px; border-radius: 8px; }
 
   #custom-wrap[hidden] { display: none; }
-  #status { min-height: 18px; margin-top: 12px; }
+  #custom { min-height: 30px; font-size: 12px; margin-top: 8px; }
+  #status { margin: 8px 2px 0; font-size: 11px; }
+  #status:empty { display: none; }
   #status.error { color: var(--sd-danger); }
 </style>
 </head>
 <body>
   <form id="form" autocomplete="off">
     <div class="box">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
       <input id="q" class="sd-input" type="search" placeholder="検索するか URL を入力" aria-label="検索語または URL" spellcheck="false">
     </div>
-    <div class="engines" id="engines" role="group" aria-label="検索エンジン"></div>
-
-    <div id="custom-wrap" hidden>
-      <label class="sd-label" for="custom">検索 URL（検索語の位置に %s）</label>
-      <input id="custom" class="sd-input" placeholder="https://example.com/search?q=%s">
+    <div class="row">
+      <div class="engines" id="engines" role="group" aria-label="検索エンジン"></div>
     </div>
-
-    <label class="sd-label" for="browser">開くブラウザ</label>
-    <select id="browser" class="sd-select"></select>
+    <div id="custom-wrap" hidden>
+      <input id="custom" class="sd-input" placeholder="検索 URL（検索語の位置に %s）" aria-label="カスタムの検索 URL">
+    </div>
+    <div class="foot">
+      <label for="browser">開くブラウザ</label>
+      <select id="browser" class="sd-select"></select>
+    </div>
   </form>
   <p id="status" class="sd-muted"></p>
 
@@ -46,11 +61,10 @@
   const ENGINES = [
     { id: "google", name: "Google", url: "https://www.google.com/search?q=%s" },
     { id: "bing", name: "Bing", url: "https://www.bing.com/search?q=%s" },
-    { id: "yahoo", name: "Yahoo! JAPAN", url: "https://search.yahoo.co.jp/search?p=%s" },
-    { id: "duckduckgo", name: "DuckDuckGo", url: "https://duckduckgo.com/?q=%s" },
+    { id: "yahoo", name: "Yahoo!", url: "https://search.yahoo.co.jp/search?p=%s" },
     { id: "youtube", name: "YouTube", url: "https://www.youtube.com/results?search_query=%s" },
     { id: "wikipedia", name: "Wikipedia", url: "https://ja.wikipedia.org/w/index.php?search=%s" },
-    { id: "custom", name: "カスタム", url: "" },
+    { id: "custom", name: "その他", url: "" },
   ];
 
   const $ = (id) => document.getElementById(id);
@@ -73,6 +87,7 @@
       return b;
     }));
     $("custom-wrap").hidden = prefs.engine !== "custom";
+    $("q").placeholder = `${(ENGINES.find((e) => e.id === prefs.engine) ?? ENGINES[0]).name} で検索、または URL`;
   }
 
   async function renderBrowsers() {
@@ -109,21 +124,20 @@
       await SideDock.browser.open(toUrl(text), prefs.browserId || undefined);
       $("q").value = "";
       setStatus("");
-      SideDock.ui.closePanel();
+      SideDock.ui.dismiss();
     } catch (err) {
       setStatus(err.message, true);
     }
   });
 
-  $("q").addEventListener("keydown", (e) => {
-    if (e.key === "Escape") SideDock.ui.closePanel();
-  });
   $("browser").addEventListener("change", () => { prefs.browserId = $("browser").value; save(); });
   $("custom").addEventListener("change", () => { prefs.custom = $("custom").value.trim(); save(); });
 
   // パネルを開くたびに入力欄へカーソルを置く
-  SideDock.on("panelShown", () => {
+  // パネルが開いたらキーボード入力を受け取り、すぐ打ち込めるようにする
+  SideDock.on("panelShown", async () => {
     setStatus("");
+    await SideDock.ui.focus().catch(() => {});
     $("q").focus();
     $("q").select();
   });
@@ -133,7 +147,6 @@
   $("custom").value = prefs.custom;
   renderEngines();
   await renderBrowsers();
-  $("q").focus();
 </script>
 </body>
 </html>

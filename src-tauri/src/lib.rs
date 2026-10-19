@@ -1,10 +1,11 @@
 mod addons;
-mod appbar;
 mod config;
+mod overlay;
 mod system;
 
 use addons::AddonInfo;
 use config::{AddonEntry, Config};
+use overlay::Overlay;
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -20,8 +21,6 @@ use tauri_plugin_dialog::DialogExt;
 
 pub struct AppState {
     config: Mutex<Config>,
-    /// 開いているパネルの幅（閉じているときは None）
-    panel: Mutex<Option<u32>>,
     pub addons: RwLock<HashMap<String, AddonInfo>>,
 }
 
@@ -32,35 +31,11 @@ struct InitData {
     addons: Vec<AddonInfo>,
     errors: Vec<String>,
     platform: &'static str,
+    suspended: bool,
 }
 
 fn main_window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window("main")
-}
-
-/// 設定とパネルの開閉状態からウィンドウの位置・大きさを決め直す
-fn apply_layout(app: &AppHandle) {
-    let Some(window) = main_window(app) else {
-        return;
-    };
-    let state = app.state::<AppState>();
-    let layout = {
-        let c = state.config.lock().unwrap();
-        appbar::Layout {
-            edge: c.edge,
-            bar: c.bar_width,
-            panel: state.panel.lock().unwrap().unwrap_or(0),
-            reserve: c.reserve_space,
-        }
-    };
-    #[cfg(windows)]
-    if let Ok(hwnd) = window.hwnd() {
-        let raw = hwnd.0 as isize;
-        // Win32 のウィンドウ操作は UI スレッドで行う
-        let _ = app.run_on_main_thread(move || appbar::apply(raw, layout));
-    }
-    #[cfg(not(windows))]
-    appbar::apply_fallback(&window, layout);
 }
 
 /// アドオンを読み直し、設定の並び順に新しいアドオンを足す
@@ -73,10 +48,10 @@ fn reload(app: &AppHandle) -> InitData {
         ids.sort();
         // 同梱アドオンの初期の並び順
         let preferred = [
+            "sidedock.clock",
             "sidedock.shortcuts",
             "sidedock.search",
             "sidedock.volume",
-            "sidedock.clock",
         ];
         ids.sort_by_key(|id| preferred.iter().position(|p| p == id).unwrap_or(usize::MAX));
         let mut changed = false;
@@ -101,6 +76,7 @@ fn reload(app: &AppHandle) -> InitData {
         addons: list,
         errors,
         platform: if cfg!(windows) { "windows" } else { "other" },
+        suspended: app.state::<Overlay>().is_suspended(),
     }
 }
 
@@ -118,24 +94,28 @@ fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Result
     let config = config.sanitize();
     config::save(&app, &config)?;
     *state.config.lock().unwrap() = config.clone();
-    apply_layout(&app);
     let _ = app.emit("config-changed", &config);
     Ok(config)
 }
 
+/// カーソルを受け取る範囲（カプセルと開いているパネル）
 #[tauri::command]
-fn set_panel(app: AppHandle, state: State<AppState>, open: bool, width: Option<u32>) {
-    let w = {
-        let default = state.config.lock().unwrap().panel_width;
-        width.unwrap_or(default).clamp(240, 720)
-    };
-    *state.panel.lock().unwrap() = open.then_some(w);
-    apply_layout(&app);
-    if open {
-        if let Some(win) = main_window(&app) {
-            let _ = win.set_focus();
-        }
+fn set_hit_rects(overlay: State<Overlay>, rects: Vec<overlay::Rect>) {
+    overlay.set_rects(rects);
+}
+
+/// 検索パネルなど、キーボード入力が必要なときにフォーカスをもらう
+#[tauri::command]
+fn take_focus(app: AppHandle) {
+    if let Some(w) = main_window(&app) {
+        let _ = w.set_focus();
     }
+}
+
+/// 隠れるときに、直前に使っていたアプリへフォーカスを返す
+#[tauri::command]
+fn release_focus(app: AppHandle) {
+    overlay::release_focus(&app);
 }
 
 #[tauri::command]
@@ -193,9 +173,6 @@ struct FileFilter {
 #[tauri::command(async)]
 fn pick_files(app: AppHandle, filters: Option<Vec<FileFilter>>) -> Vec<String> {
     let mut dialog = app.dialog().file();
-    if let Some(win) = main_window(&app) {
-        dialog = dialog.set_parent(&win);
-    }
     for f in filters.unwrap_or_default() {
         let exts: Vec<&str> = f.extensions.iter().map(String::as_str).collect();
         dialog = dialog.add_filter(&f.name, &exts);
@@ -211,11 +188,8 @@ fn pick_files(app: AppHandle, filters: Option<Vec<FileFilter>>) -> Vec<String> {
 
 #[tauri::command(async)]
 fn pick_folder(app: AppHandle) -> Option<String> {
-    let mut dialog = app.dialog().file();
-    if let Some(win) = main_window(&app) {
-        dialog = dialog.set_parent(&win);
-    }
-    dialog
+    app.dialog()
+        .file()
         .blocking_pick_folder()
         .and_then(|p| p.into_path().ok())
         .map(|p| p.to_string_lossy().into_owned())
@@ -312,26 +286,28 @@ pub fn run() {
             let handle = app.handle().clone();
             app.manage(AppState {
                 config: Mutex::new(config::load(&handle)),
-                panel: Mutex::new(None),
                 addons: RwLock::new(HashMap::new()),
             });
+            app.manage(Overlay::new());
             // 起動直後にアドオン一覧を用意しておく（addon:// の配信に必要）
             reload(&handle);
             build_tray(&handle)?;
-            apply_layout(&handle);
-            // 位置を決めてから表示する（apply_layout と同じキューに積むので順番が保たれる）
-            let h = handle.clone();
-            handle.run_on_main_thread(move || {
-                if let Some(w) = main_window(&h) {
-                    let _ = w.show();
-                }
-            })?;
+
+            if let Some(w) = main_window(&handle) {
+                // ふだんはクリックを下のアプリへ素通しする
+                let _ = w.set_ignore_cursor_events(true);
+            }
+            overlay::layout(&handle);
+            overlay::show(&handle);
+            overlay::start(handle);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             init,
             save_config,
-            set_panel,
+            set_hit_rects,
+            take_focus,
+            release_focus,
             open_addons_folder,
             autostart_get,
             autostart_set,
@@ -351,10 +327,5 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("SideDock の起動に失敗しました");
 
-    app.run(|_app, event| {
-        if let RunEvent::Exit = event {
-            #[cfg(windows)]
-            appbar::unregister();
-        }
-    });
+    app.run(|_app, _event: RunEvent| {});
 }

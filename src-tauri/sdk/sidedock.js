@@ -16,7 +16,7 @@
     root.dataset.theme = dark ? "dark" : "light";
     root.style.colorScheme = dark ? "dark" : "light";
   };
-  applyTheme(params.get("theme") === "dark");
+  applyTheme(params.get("theme") !== "light");
   document.documentElement.dataset.slot = slot;
 
   let seq = 0;
@@ -66,38 +66,78 @@
     const off = on("init", (data) => { off(); resolve(data); });
   });
 
-  // バーに置くウィジェットは、中身の高さに合わせて iframe の高さを自動で変える
-  if (slot === "bar") {
-    let last = -1;
-    const report = () => {
-      const h = Math.ceil(document.body?.getBoundingClientRect().height ?? 0);
-      if (h !== last) {
-        last = h;
-        call("ui.setHeight", { height: h }).catch(() => {});
-      }
-    };
-    const start = () => {
-      new ResizeObserver(report).observe(document.body);
-      report();
-    };
-    document.readyState === "loading"
-      ? document.addEventListener("DOMContentLoaded", start)
-      : start();
-  }
+  // 中身の大きさに合わせて iframe の大きさを本体に伝える
+  //   bar   … 幅（高さは 32px 固定）
+  //   panel … 高さ（幅は manifest の panel.width）
+  const measure = () => {
+    const r = document.body.getBoundingClientRect();
+    return Math.ceil(slot === "bar" ? r.width : r.height);
+  };
+  let last = -1;
+  const report = () => {
+    const v = measure();
+    if (v === last) return;
+    last = v;
+    const method = slot === "bar" ? "ui.setWidth" : "ui.setHeight";
+    call(method, slot === "bar" ? { width: v } : { height: v }).catch(() => {});
+  };
+  const start = () => {
+    new ResizeObserver(report).observe(document.body);
+    report();
+  };
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", start) : start();
+
+  // data-hint を付けた要素にカーソルを乗せると、カプセルの下に小さな説明が出る
+  let hinted = null;
+  document.addEventListener("pointerover", (e) => {
+    const el = e.target.closest?.("[data-hint]");
+    if (el === hinted) return;
+    hinted = el;
+    if (!el) return call("ui.hint", { text: null }).catch(() => {});
+    const r = el.getBoundingClientRect();
+    call("ui.hint", { text: el.dataset.hint, x: r.left + r.width / 2 }).catch(() => {});
+  });
+  document.documentElement.addEventListener("pointerleave", () => {
+    if (hinted) call("ui.hint", { text: null }).catch(() => {});
+    hinted = null;
+  });
+
+  // Esc で閉じる／右クリックメニューは入力欄以外では出さない
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") call("ui.dismiss").catch(() => {});
+  });
+  document.addEventListener("contextmenu", (e) => {
+    if (!e.target.closest?.("input, textarea, [contenteditable]")) e.preventDefault();
+  });
+
+  // スライダーの塗り（.sd-range の --v）を値に合わせる
+  const paintRange = (el) => {
+    const min = Number(el.min || 0), max = Number(el.max || 100);
+    el.style.setProperty("--v", `${((Number(el.value) - min) / (max - min || 1)) * 100}%`);
+  };
+  document.addEventListener("input", (e) => {
+    if (e.target.matches?.(".sd-range")) paintRange(e.target);
+  });
 
   window.SideDock = Object.freeze({
-    /** "bar"（バーのウィジェット）か "panel"（パネル） */
+    /** "bar"（カプセルに並ぶウィジェット）か "panel"（下に開くパネル） */
     slot,
     /** 本体との接続が済むと解決する。{ addonId, slot, dark, permissions } */
     ready,
     get context() { return context; },
     call,
-    /** イベント：init / theme / panelShown / panelHidden / storageChanged / drop */
+    /** イベント：init / theme / panelShown / panelHidden / storageChanged / drop / revealed / concealed */
     on,
     ui: {
       openPanel: () => call("ui.openPanel"),
       closePanel: () => call("ui.closePanel"),
-      setHeight: (height) => call("ui.setHeight", { height }),
+      togglePanel: () => call("ui.togglePanel"),
+      /** キーボード入力を受け取れるようにする（検索欄など） */
+      focus: () => call("ui.focus"),
+      /** SideDock ごと引っ込める */
+      dismiss: () => call("ui.dismiss"),
+      hint: (text, x) => call("ui.hint", { text, x }),
+      paintRange,
     },
     storage: {
       get: () => call("storage.get"),

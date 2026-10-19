@@ -5,20 +5,38 @@
 <link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
 <script src="http://addon.localhost/_sdk/sidedock.js"></script>
 <style>
-  .main { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-  #mute { flex: none; width: 36px; height: 36px; }
+  body { padding: 12px 14px 14px; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; margin: 0 2px 6px; }
+  .label { font-size: 11.5px; color: var(--sd-ink-2); }
+  #pct {
+    font: 600 22px/1 var(--sd-font-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    transition: color 0.25s;
+  }
+  #pct small { font-size: 12px; font-weight: 500; color: var(--sd-ink-3); margin-left: 1px; }
+  body.muted #pct { color: var(--sd-ink-3); }
+
+  .main { display: flex; align-items: center; gap: 8px; }
+  #mute { flex: none; width: 30px; height: 30px; border-radius: 15px; }
+  #mute[aria-pressed="true"] { color: var(--sd-danger); }
   #range { flex: 1; }
-  #pct { width: 3ch; text-align: right; font-size: 15px; font-variant-numeric: tabular-nums; }
-  .presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 18px; }
-  .presets .sd-btn { padding: 0; font-variant-numeric: tabular-nums; }
-  #error { margin-top: 14px; color: var(--sd-danger); }
+  body.muted #range { filter: saturate(0); opacity: 0.6; }
+
+  .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; }
+  .presets .sd-btn { min-height: 24px; padding: 0; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--sd-ink-2); }
+  .presets .sd-btn:hover { color: var(--sd-ink); }
+  #error { margin: 10px 2px 0; color: var(--sd-danger); }
 </style>
 </head>
 <body>
+  <div class="top">
+    <span class="label">音量</span>
+    <span id="pct" aria-live="polite"></span>
+  </div>
   <div class="main">
     <button id="mute" class="sd-btn ghost icon" aria-label="ミュート"></button>
     <input id="range" class="sd-range" type="range" min="0" max="100" step="1" aria-label="音量">
-    <span id="pct" aria-hidden="true"></span>
   </div>
   <div class="presets" id="presets"></div>
   <p id="error" class="sd-muted" hidden></p>
@@ -32,11 +50,15 @@
 
   function render() {
     const pct = Math.round(current.level * 100);
-    if (!dragging) $("range").value = pct;
-    $("pct").textContent = pct;
-    $("mute").innerHTML = speaker(current.level, current.muted, 20);
-    $("mute").title = current.muted ? "ミュートを解除" : "ミュート";
+    if (!dragging) {
+      $("range").value = pct;
+      SideDock.ui.paintRange($("range"));
+    }
+    $("pct").innerHTML = `${pct}<small>%</small>`;
+    $("mute").innerHTML = speaker(current.level, current.muted, 18);
     $("mute").setAttribute("aria-pressed", String(current.muted));
+    $("mute").setAttribute("aria-label", current.muted ? "ミュートを解除" : "ミュート");
+    document.body.classList.toggle("muted", current.muted);
   }
 
   async function refresh() {
@@ -50,10 +72,18 @@
     }
   }
 
+  let sending = false;
   async function setLevel(pct) {
     current = { level: pct / 100, muted: pct > 0 ? false : current.muted };
     render();
-    await SideDock.volume.set(pct / 100).catch(() => {});
+    if (sending) return;
+    sending = true;
+    let sent = -1;
+    while (sent !== current.level) {
+      sent = current.level;
+      await SideDock.volume.set(sent).catch(() => {});
+    }
+    sending = false;
   }
 
   $("range").addEventListener("input", () => { dragging = true; setLevel(Number($("range").value)); });
@@ -63,7 +93,7 @@
     refresh();
   });
 
-  $("presets").replaceChildren(...[0, 25, 50, 75, 100].map((v) => {
+  $("presets").replaceChildren(...[25, 50, 75, 100].map((v) => {
     const b = document.createElement("button");
     b.className = "sd-btn";
     b.textContent = v;
@@ -75,9 +105,8 @@
   let timer = null;
   SideDock.on("panelShown", () => {
     refresh();
-    $("range").focus();
     clearInterval(timer);
-    timer = setInterval(() => { if (!dragging) refresh(); }, 1000);
+    timer = setInterval(() => { if (!dragging && !sending) refresh(); }, 1000);
   });
   SideDock.on("panelHidden", () => clearInterval(timer));
 

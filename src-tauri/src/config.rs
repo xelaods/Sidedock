@@ -4,13 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum Edge {
-    Left,
-    Right,
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AddonEntry {
@@ -21,14 +14,10 @@ pub struct AddonEntry {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Config {
-    /// 画面のどちら側に置くか
-    pub edge: Edge,
-    /// バーの幅（論理px）
-    pub bar_width: u32,
-    /// パネルの既定の幅（論理px）
-    pub panel_width: u32,
-    /// AppBar として画面の領域を確保する（最大化したウィンドウと重ならない）
-    pub reserve_space: bool,
+    /// 画面上部のどこに出すか："left" | "center" | "right"
+    pub position: String,
+    /// 近づいたときに反応する範囲："narrow" | "normal" | "wide"
+    pub trigger: String,
     /// "system" | "light" | "dark"
     pub theme: String,
     /// アドオンの並び順と有効/無効
@@ -38,23 +27,26 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            edge: Edge::Right,
-            bar_width: 52,
-            panel_width: 340,
-            reserve_space: true,
-            theme: "system".into(),
+            position: "center".into(),
+            trigger: "normal".into(),
+            theme: "dark".into(),
             addons: Vec::new(),
         }
     }
 }
 
 impl Config {
-    /// 値の範囲を正す（手で config.json を書き換えた場合の保険）
+    /// 値の範囲を正す（手で config.json を書き換えた場合や、古い版の設定の保険）
     pub fn sanitize(mut self) -> Self {
-        self.bar_width = self.bar_width.clamp(40, 96);
-        self.panel_width = self.panel_width.clamp(240, 720);
+        let d = Self::default();
+        if !matches!(self.position.as_str(), "left" | "center" | "right") {
+            self.position = d.position;
+        }
+        if !matches!(self.trigger.as_str(), "narrow" | "normal" | "wide") {
+            self.trigger = d.trigger;
+        }
         if !matches!(self.theme.as_str(), "system" | "light" | "dark") {
-            self.theme = "system".into();
+            self.theme = d.theme;
         }
         let mut seen = std::collections::HashSet::new();
         self.addons.retain(|a| seen.insert(a.id.clone()));

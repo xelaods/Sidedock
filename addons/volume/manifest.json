@@ -1,11 +1,19 @@
 {
   "id": "sidedock.volume",
   "name": "音量",
-  "version": "1.0.0",
-  "description": "スクロールで音量を変え、クリックでスライダーを開きます",
+  "version": "2.0.0",
+  "description": "スクロールで調整、近づけるとスライダーが開きます",
   "author": "SideDock",
   "icon": "icon.svg",
-  "bar": { "entry": "bar.html" },
-  "panel": { "entry": "panel.html", "title": "音量", "width": 300 },
-  "permissions": ["volume"]
+  "bar": {
+    "entry": "bar.html"
+  },
+  "panel": {
+    "entry": "panel.html",
+    "title": "音量",
+    "width": 250
+  },
+  "permissions": [
+    "volume"
+  ]
 }

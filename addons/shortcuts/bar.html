@@ -5,35 +5,43 @@
 <link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
 <script src="http://addon.localhost/_sdk/sidedock.js"></script>
 <style>
-  #list { display: flex; flex-direction: column; }
+  #list { display: flex; gap: 2px; }
   .fallback {
-    width: 26px; height: 26px; border-radius: 6px;
+    width: 20px; height: 20px; border-radius: 6px;
     display: grid; place-items: center;
     background: var(--sd-surface); box-shadow: inset 0 0 0 1px var(--sd-line);
-    font-size: 13px; font-weight: 600; color: var(--sd-ink-2);
+    font-size: 11px; font-weight: 600; color: var(--sd-ink-2);
+  }
+  /* 起動したときに軽く弾む */
+  .launch { animation: launch 0.6s var(--sd-ease); }
+  @keyframes launch {
+    0% { transform: scale(1); }
+    25% { transform: scale(0.82); }
+    60% { transform: scale(1.12) translateY(2px); }
+    100% { transform: scale(1); }
   }
   #add { color: var(--sd-ink-3); }
   #add:hover { color: var(--sd-ink); }
-  .sep { height: 1px; margin: 4px 14px; background: var(--sd-line); }
+  #add.empty { width: auto; padding: 0 10px 0 8px; gap: 6px; display: inline-flex; font-size: 12px; color: var(--sd-ink-2); }
 </style>
 </head>
 <body>
   <div id="list"></div>
-  <button id="add" class="sd-bar-btn" title="ショートカットを追加・編集" aria-label="ショートカットを追加・編集">
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  <button id="add" class="sd-bar-btn" aria-label="ショートカットを追加・編集" data-hint="追加・編集">
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
   </button>
-  <div class="sep"></div>
 <script type="module">
   import { load, save, addPaths } from "./common.js";
 
   let items = [];
   const list = document.getElementById("list");
+  const add = document.getElementById("add");
 
   function render() {
     list.replaceChildren(...items.map((item) => {
       const b = document.createElement("button");
       b.className = "sd-bar-btn";
-      b.title = item.name;
+      b.dataset.hint = item.name;
       b.setAttribute("aria-label", `${item.name}を開く`);
       if (item.icon) {
         const img = document.createElement("img");
@@ -46,17 +54,31 @@
         f.textContent = item.name.slice(0, 1);
         b.append(f);
       }
-      b.addEventListener("click", () => SideDock.app.launch(item.path).catch((e) => { b.title = `${item.name}（${e.message}）`; }));
+      b.addEventListener("click", async () => {
+        b.classList.remove("launch");
+        void b.offsetWidth;
+        b.classList.add("launch");
+        try {
+          await SideDock.app.launch(item.path);
+          setTimeout(() => SideDock.ui.dismiss(), 260);
+        } catch (e) {
+          SideDock.ui.hint(`開けませんでした：${item.name}`, b.offsetLeft + 16);
+        }
+      });
       // 右クリックで編集画面
       b.addEventListener("contextmenu", (e) => { e.preventDefault(); SideDock.ui.openPanel(); });
       return b;
     }));
+    // まだ何もないときは「追加」と文字で出す
+    add.classList.toggle("empty", items.length === 0);
+    add.lastChild.nodeType === 3 && add.lastChild.remove();
+    if (!items.length) add.append("アプリを追加");
   }
 
-  document.getElementById("add").addEventListener("click", () => SideDock.ui.openPanel());
+  add.addEventListener("click", () => SideDock.ui.togglePanel());
 
   SideDock.on("storageChanged", (data) => { items = data?.items ?? []; render(); });
-  // バーにファイルやショートカットをドロップしたら追加する
+  // ファイルやショートカットをカプセルにドロップしたら追加する
   SideDock.on("drop", async ({ paths }) => {
     items = await addPaths(items, paths);
     render();

@@ -1,8 +1,8 @@
 {
   "name": "sidedock",
   "private": true,
-  "version": "0.1.0",
-  "description": "画面端に常駐する、アドオンで拡張できるサイドバー",
+  "version": "0.2.0",
+  "description": "画面上部に隠れていて、近づくと出てくるランチャー",
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",

@@ -25,6 +25,9 @@ pub struct Slot {
     /// パネルの幅（論理px、panel のみ）
     #[serde(default)]
     pub width: Option<u32>,
+    /// パネルの開き方（panel のみ）："hover"（近づけると開く、既定）か "manual"（アドオンが開く）
+    #[serde(default)]
+    pub trigger: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Debug)]

@@ -5,58 +5,78 @@
 <link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
 <script src="http://addon.localhost/_sdk/sidedock.js"></script>
 <style>
-  #btn { height: 48px; grid-template-rows: 22px 14px; align-content: center; gap: 1px; }
-  #btn svg { display: block; }
-  #pct { font-size: 10.5px; line-height: 14px; color: var(--sd-ink-2); font-variant-numeric: tabular-nums; }
+  #btn { width: auto; padding: 0 10px 0 7px; gap: 7px; display: inline-flex; align-items: center; }
+  #btn:hover { transform: none; }
   #btn.muted { color: var(--sd-ink-3); }
+  /* 小さな音量メーター */
+  .meter {
+    position: relative; width: 30px; height: 4px; border-radius: 2px;
+    background: var(--sd-line); overflow: hidden;
+  }
+  .meter b {
+    position: absolute; inset: 0; border-radius: inherit;
+    background: currentColor;
+    transform-origin: 0 50%;
+    transform: scaleX(var(--v, 0));
+    transition: transform 0.45s var(--sd-ease);
+  }
+  #btn.muted .meter b { opacity: 0.35; }
+  /* スクロールで動かしている間はメーターが光る */
+  #btn.busy .meter b { background: var(--sd-accent); box-shadow: 0 0 8px var(--sd-glow); transition-duration: 0.12s; }
 </style>
 </head>
 <body>
   <button id="btn" class="sd-bar-btn" aria-label="音量">
     <span id="icon"></span>
-    <span id="pct">--</span>
+    <span class="meter" aria-hidden="true"><b id="fill"></b></span>
   </button>
 <script type="module">
   import { speaker } from "./speaker.js";
 
   const btn = document.getElementById("btn");
   let current = { level: 0, muted: false };
+  let busyTimer = 0;
 
   function render() {
     const pct = Math.round(current.level * 100);
-    document.getElementById("icon").innerHTML = speaker(current.level, current.muted);
-    document.getElementById("pct").textContent = current.muted ? "消音" : String(pct);
+    document.getElementById("icon").innerHTML = speaker(current.level, current.muted, 18);
+    document.getElementById("fill").style.setProperty("--v", current.muted ? 0 : current.level);
     btn.classList.toggle("muted", current.muted);
-    btn.title = current.muted ? "ミュート中（クリックで調整）" : `音量 ${pct}%（スクロールで調整）`;
+    btn.dataset.hint = current.muted ? "ミュート中" : `音量 ${pct}%`;
   }
 
   async function refresh() {
     try {
       current = await SideDock.volume.get();
       render();
-    } catch {
-      document.getElementById("pct").textContent = "--";
-    }
+    } catch {}
   }
 
   // ホイールで 2% ずつ（Shift を押しながらで 10% ずつ）
-  let busy = false;
+  let sending = false;
   btn.addEventListener("wheel", async (e) => {
     e.preventDefault();
-    if (busy) return;
-    busy = true;
     const step = (e.shiftKey ? 10 : 2) / 100;
     const level = Math.min(1, Math.max(0, Math.round((current.level + (e.deltaY < 0 ? step : -step)) * 100) / 100));
     current = { level, muted: level > 0 ? false : current.muted };
     render();
-    await SideDock.volume.set(level).catch(() => {});
-    busy = false;
+    SideDock.ui.hint(`音量 ${Math.round(level * 100)}%`, btn.offsetWidth / 2);
+    btn.classList.add("busy");
+    clearTimeout(busyTimer);
+    busyTimer = setTimeout(() => btn.classList.remove("busy"), 500);
+    if (sending) return;
+    sending = true;
+    // 回している間に変わった分も、最後の値まで確実に送る
+    let sent = -1;
+    while (sent !== current.level) {
+      sent = current.level;
+      await SideDock.volume.set(sent).catch(() => {});
+    }
+    sending = false;
   }, { passive: false });
 
-  btn.addEventListener("click", () => SideDock.ui.openPanel());
-  // 中クリックでミュートの切り替え
-  btn.addEventListener("auxclick", async (e) => {
-    if (e.button !== 1) return;
+  // クリックでミュートの切り替え（近づけるとスライダーのパネルが開く）
+  btn.addEventListener("click", async () => {
     await SideDock.volume.setMute(!current.muted).catch(() => {});
     refresh();
   });
@@ -64,7 +84,7 @@
   await SideDock.ready;
   refresh();
   // 他のアプリやキーボードで変えた音量にも追いつく
-  setInterval(() => { if (!busy) refresh(); }, 1500);
+  setInterval(() => { if (!sending) refresh(); }, 1500);
 </script>
 </body>
 </html>
