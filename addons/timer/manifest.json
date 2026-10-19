@@ -1,0 +1,12 @@
+{
+  "id": "sidedock.timer",
+  "name": "タイマー",
+  "version": "1.0.0",
+  "description": "カップ麺からポモドーロまで。残り時間がカプセルに出ます",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "panel": { "entry": "panel.html", "title": "タイマー", "width": 280 },
+  "permissions": [],
+  "defaultEnabled": false
+}

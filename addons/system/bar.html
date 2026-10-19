@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 0 8px; gap: 10px; }
+  .m { display: flex; flex-direction: column; gap: 3px; width: 40px; }
+  .m span { font: 600 10px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; color: var(--sd-ink-2); display: flex; justify-content: space-between; gap: 4px; }
+  .m em { font-style: normal; }
+  .m span b { font-weight: 500; font-size: 9px; letter-spacing: 0.02em; color: var(--sd-ink-3); }
+  .m i { display: block; height: 3px; border-radius: 2px; background: var(--sd-line); overflow: hidden; }
+  .m i::after { content: ""; display: block; height: 100%; width: calc(var(--v, 0) * 1%); background: var(--sd-ink-2); border-radius: inherit; transition: width 0.8s var(--sd-ease), background 0.3s; }
+  .m.warm i::after { background: #f5b14c; }
+  .m.hot i::after { background: #ff6b6b; box-shadow: 0 0 6px #ff6b6b; }
+  #bat[hidden] { display: none; }
+</style>
+</head>
+<body>
+  <div class="m" id="cpu" data-hint="CPU"><span><b>CPU</b><em id="cpuv">--</em></span><i></i></div>
+  <div class="m" id="mem" data-hint="メモリ"><span><b>MEM</b><em id="memv">--</em></span><i></i></div>
+  <div class="m" id="bat" hidden data-hint="バッテリー"><span><b id="batl">BAT</b><em id="batv">--</em></span><i></i></div>
+<script type="module">
+  import { bytes, level } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  const set = (id, pct, text) => {
+    $(id).style.setProperty("--v", pct.toFixed(0));
+    $(id).className = `m ${level(pct)}`;
+    $(id + "v").textContent = text;
+  };
+  async function tick() {
+    try {
+      const s = await SideDock.system.stats();
+      set("cpu", s.cpu, `${Math.round(s.cpu)}`);
+      const mp = (s.memUsed / s.memTotal) * 100;
+      set("mem", mp, `${Math.round(mp)}`);
+      $("cpu").dataset.hint = `CPU ${Math.round(s.cpu)}%`;
+      $("mem").dataset.hint = `メモリ ${bytes(s.memUsed)} / ${bytes(s.memTotal)}`;
+      $("bat").hidden = s.battery == null;
+      if (s.battery != null) {
+        // 電池は「残りが少ないほど危ない」ので色の向きを逆にする
+        $("bat").style.setProperty("--v", s.battery);
+        $("bat").className = `m ${s.charging ? "" : s.battery <= 15 ? "hot" : s.battery <= 30 ? "warm" : ""}`;
+        $("batv").textContent = `${s.battery}`;
+        $("batl").textContent = s.charging ? "⚡" : "BAT";
+        $("bat").dataset.hint = `バッテリー ${s.battery}%${s.charging ? "（充電中）" : ""}`;
+      }
+    } catch {}
+  }
+  await SideDock.ready;
+  tick();
+  setInterval(tick, 2000);
+</script>
+</body>
+</html>

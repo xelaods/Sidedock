@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 12px; }
+  .screen { padding: 8px 10px 10px; border-radius: 12px; background: var(--sd-surface-2); box-shadow: inset 0 0 0 1px var(--sd-line); text-align: right; }
+  #expr {
+    width: 100%; border: 0; background: transparent; color: var(--sd-ink-2);
+    font: 13px/1.4 var(--sd-font); text-align: right; user-select: text; padding: 0;
+  }
+  #expr:focus { outline: none; color: var(--sd-ink); }
+  #out { font: 600 26px/1.2 var(--sd-font-display); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 31px; transition: color 0.2s; }
+  #out.err { color: var(--sd-ink-3); font-size: 14px; line-height: 31px; }
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
+  .keys button {
+    appearance: none; border: 0; min-height: 34px; border-radius: 9px; cursor: default;
+    background: var(--sd-surface); color: var(--sd-ink); box-shadow: inset 0 0 0 1px var(--sd-line);
+    font: 500 14px/1 var(--sd-font-display);
+    transition: background 0.15s, transform 0.2s var(--sd-ease);
+  }
+  .keys button:hover { background: var(--sd-hover); }
+  .keys button:active { transform: scale(0.94); transition-duration: 0.06s; }
+  .keys .op { color: var(--sd-accent); }
+  .keys .eq { background: var(--sd-accent); color: var(--sd-accent-ink); box-shadow: none; font-weight: 600; }
+  .hist { margin-top: 8px; font-size: 11px; color: var(--sd-ink-3); }
+  .hist div { display: flex; justify-content: space-between; gap: 8px; padding: 2px 4px; border-radius: 6px; cursor: default; }
+  .hist div:hover { background: var(--sd-hover); color: var(--sd-ink); }
+  .hist span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <input id="expr" placeholder="例 1200*1.1 や (3+4)^2" aria-label="式" spellcheck="false" autocomplete="off">
+    <div id="out">0</div>
+  </div>
+  <div class="keys" id="keys"></div>
+  <div class="hist" id="hist"></div>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  let history = [];
+
+  // 安全な式の計算（eval は使わない）。+ - * / % ^ () と小数、√ に対応
+  function evaluate(src) {
+    const s = src.replace(/×/g, "*").replace(/÷/g, "/").replace(/，|,/g, "").replace(/\s+/g, "")
+      .replace(/[０-９．]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+    let i = 0;
+    const peek = () => s[i];
+    function num() {
+      const m = /^(\d+\.?\d*|\.\d+)(e[+-]?\d+)?/i.exec(s.slice(i));
+      if (!m) throw new Error();
+      i += m[0].length;
+      return parseFloat(m[0]);
+    }
+    function atom() {
+      if (peek() === "(") { i++; const v = expr(); if (peek() !== ")") throw new Error(); i++; return v; }
+      if (peek() === "√") { i++; return Math.sqrt(unary()); }
+      if (s.startsWith("pi", i) || peek() === "π") { i += peek() === "π" ? 1 : 2; return Math.PI; }
+      return num();
+    }
+    function unary() {
+      if (peek() === "-") { i++; return -unary(); }
+      if (peek() === "+") { i++; return unary(); }
+      let v = atom();
+      while (peek() === "%") { i++; v /= 100; }
+      return v;
+    }
+    function power() {
+      const b = unary();
+      if (peek() === "^") { i++; return b ** power(); }
+      return b;
+    }
+    function term() {
+      let v = power();
+      while (peek() === "*" || peek() === "/") {
+        const op = s[i++];
+        const r = power();
+        v = op === "*" ? v * r : v / r;
+      }
+      return v;
+    }
+    function expr() {
+      let v = term();
+      while (peek() === "+" || peek() === "-") {
+        const op = s[i++];
+        const r = term();
+        v = op === "+" ? v + r : v - r;
+      }
+      return v;
+    }
+    const v = expr();
+    if (i !== s.length || !isFinite(v)) throw new Error();
+    return v;
+  }
+  const fmt = (v) => {
+    const r = Math.round(v * 1e10) / 1e10;
+    return Math.abs(r) >= 1e15 ? r.toExponential(6) : r.toLocaleString("ja-JP", { maximumFractionDigits: 10 });
+  };
+
+  function update() {
+    const src = $("expr").value.trim();
+    if (!src) { $("out").textContent = "0"; $("out").className = ""; return null; }
+    try {
+      const v = evaluate(src);
+      $("out").textContent = fmt(v);
+      $("out").className = "";
+      return v;
+    } catch {
+      $("out").textContent = "…";
+      $("out").className = "err";
+      return null;
+    }
+  }
+  function commit() {
+    const src = $("expr").value.trim();
+    const v = update();
+    if (v == null) return;
+    history = [{ src, v }, ...history.filter((h) => h.src !== src)].slice(0, 4);
+    $("expr").value = String(Math.round(v * 1e10) / 1e10);
+    renderHist();
+    SideDock.storage.set({ history });
+  }
+  function renderHist() {
+    $("hist").replaceChildren(...history.map((h) => {
+      const d = document.createElement("div");
+      d.innerHTML = `<span></span><span></span>`;
+      d.children[0].textContent = h.src;
+      d.children[1].textContent = `= ${fmt(h.v)}`;
+      d.title = "式を入れ直す";
+      d.addEventListener("click", () => { $("expr").value = h.src; update(); $("expr").focus(); });
+      return d;
+    }));
+  }
+
+  const KEYS = ["C", "(", ")", "÷", "7", "8", "9", "×", "4", "5", "6", "-", "1", "2", "3", "+", "0", ".", "⌫", "="];
+  $("keys").replaceChildren(...KEYS.map((k) => {
+    const b = document.createElement("button");
+    b.textContent = k;
+    if ("÷×-+()".includes(k)) b.className = "op";
+    if (k === "=") b.className = "eq";
+    b.addEventListener("click", () => {
+      const e = $("expr");
+      if (k === "C") e.value = "";
+      else if (k === "⌫") e.value = e.value.slice(0, -1);
+      else if (k === "=") return commit();
+      else e.value += k;
+      update();
+    });
+    return b;
+  }));
+
+  $("expr").addEventListener("input", update);
+  $("expr").addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); });
+  SideDock.on("panelShown", async () => { await SideDock.ui.focus().catch(() => {}); $("expr").focus(); $("expr").select(); });
+  await SideDock.ready;
+  history = (await SideDock.storage.get())?.history ?? [];
+  renderHist();
+</script>
+</body>
+</html>

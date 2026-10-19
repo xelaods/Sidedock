@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 0 2px 0 4px; gap: 6px; }
+  #idle { color: var(--sd-ink-3); }
+  #now { display: flex; align-items: center; gap: 8px; }
+  #now[hidden], #idle[hidden] { display: none; }
+
+  /* ジャケット。再生中はゆっくり呼吸するように光る */
+  .art {
+    position: relative; flex: none;
+    width: 24px; height: 24px; border-radius: 6px;
+    background: var(--sd-surface) center / cover no-repeat;
+    box-shadow: inset 0 0 0 1px var(--sd-line), 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.4s var(--sd-ease), filter 0.4s;
+  }
+  .art.none { display: grid; place-items: center; color: var(--sd-ink-3); }
+  .art.none svg { width: 14px; height: 14px; }
+  body.paused .art { filter: saturate(0.4) brightness(0.8); transform: scale(0.92); }
+
+  /* 曲名と歌手。長いときは左へ流れる */
+  .text { width: 132px; overflow: hidden; line-height: 1.15; mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .text.short { mask-image: none; }
+  .line { white-space: nowrap; display: inline-block; }
+  .title { font-size: 12px; font-weight: 600; }
+  .artist { font-size: 10.5px; color: var(--sd-ink-2); }
+  .scroll .line { animation: marquee var(--dur, 10s) linear infinite; padding-right: 32px; }
+  @keyframes marquee { 0%, 12% { transform: translateX(0); } 100% { transform: translateX(var(--shift, -50%)); } }
+  body.paused .scroll .line { animation-play-state: paused; }
+
+  /* 再生中を示す小さなイコライザー */
+  .eq { display: flex; align-items: flex-end; gap: 1.5px; height: 10px; width: 9px; flex: none; }
+  .eq i { width: 2px; border-radius: 1px; background: var(--sd-accent); animation: eq 0.9s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: -0.3s; } .eq i:nth-child(3) { animation-delay: -0.6s; }
+  @keyframes eq { 0%, 100% { height: 3px; } 50% { height: 10px; } }
+  body.paused .eq i { animation: none; height: 3px; background: var(--sd-ink-3); }
+
+  #toggle svg { width: 15px; height: 15px; }
+</style>
+</head>
+<body>
+  <button id="idle" class="sd-bar-btn" aria-label="再生中のメディアはありません" data-hint="再生中のメディアはありません"></button>
+  <div id="now" hidden>
+    <div class="art" id="art"></div>
+    <div class="text" id="text">
+      <div><span class="line title" id="title"></span></div>
+      <div><span class="line artist" id="artist"></span></div>
+    </div>
+    <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+    <button id="toggle" class="sd-bar-btn" aria-label="再生・一時停止"></button>
+  </div>
+<script type="module">
+  import { ICONS, appName, watch } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  $("idle").innerHTML = ICONS.note;
+
+  let last = "";
+  function fit() {
+    // 長い曲名だけ流す
+    for (const box of [$("text")]) {
+      const lines = box.querySelectorAll(".line");
+      let scroll = false;
+      lines.forEach((l) => { if (l.scrollWidth > box.clientWidth) scroll = true; });
+      box.classList.toggle("scroll", scroll);
+      box.classList.toggle("short", !scroll);
+      lines.forEach((l) => {
+        const over = l.scrollWidth - box.clientWidth;
+        l.style.setProperty("--shift", `${-Math.max(0, over + 24)}px`);
+        l.style.setProperty("--dur", `${Math.max(6, (over + 24) / 18)}s`);
+      });
+    }
+  }
+
+  const w = watch((info, art) => {
+    const playing = info?.status === "playing";
+    $("idle").hidden = !!info;
+    $("now").hidden = !info;
+    document.body.classList.toggle("paused", !playing);
+    if (!info) return;
+    const key = `${info.title}|${info.artist}`;
+    if (key !== last) {
+      last = key;
+      $("title").textContent = info.title || "不明な曲";
+      $("artist").textContent = info.artist || appName(info.app);
+      requestAnimationFrame(fit);
+    }
+    const a = $("art");
+    a.classList.toggle("none", !art);
+    a.style.backgroundImage = art ? `url("${art}")` : "";
+    a.innerHTML = art ? "" : ICONS.note;
+    $("toggle").innerHTML = playing ? ICONS.pause : ICONS.play;
+    $("toggle").dataset.hint = playing ? "一時停止" : "再生";
+    $("now").dataset.hint = `${info.title}${info.artist ? " — " + info.artist : ""}（${appName(info.app)}）`;
+  });
+
+  $("toggle").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    await SideDock.media.control("toggle").catch(() => {});
+    setTimeout(() => w.now(), 250);
+  });
+  // ホイールで曲送り・曲戻し（回しすぎて何曲も飛ばないよう、少し間を空ける）
+  let wheelLock = 0;
+  $("now").addEventListener("wheel", async (e) => {
+    e.preventDefault();
+    if (Date.now() < wheelLock || (Math.abs(e.deltaY) < 30 && Math.abs(e.deltaX) < 30)) return;
+    wheelLock = Date.now() + 700;
+    await SideDock.media.control((e.deltaY || e.deltaX) > 0 ? "next" : "prev").catch(() => {});
+    setTimeout(() => w.now(), 400);
+  }, { passive: false });
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.calc",
+  "name": "電卓",
+  "version": "1.0.0",
+  "description": "式をそのまま打ち込んで計算できます（キーボードでも）",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "電卓", "width": 260 },
+  "permissions": [],
+  "defaultEnabled": false
+}

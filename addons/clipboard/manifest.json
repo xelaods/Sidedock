@@ -1,0 +1,10 @@
+{
+  "id": "sidedock.clipboard",
+  "name": "クリップボード履歴",
+  "version": "1.0.0",
+  "description": "コピーした文字を覚えておき、クリックでもう一度コピーできます",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "クリップボード", "width": 320 },
+  "permissions": ["clipboard"]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.media",
+  "name": "再生中の音楽",
+  "version": "1.0.0",
+  "description": "Spotify・Apple Music・YouTube などの再生中の曲を表示・操作します",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "panel": { "entry": "panel.html", "title": "再生中", "width": 300 },
+  "permissions": ["media"]
+}

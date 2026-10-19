@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 10px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .act {
+    position: relative; overflow: hidden;
+    appearance: none; border: 0; cursor: default;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+    padding: 11px 12px; border-radius: 12px;
+    background: var(--sd-surface); color: var(--sd-ink); box-shadow: inset 0 0 0 1px var(--sd-line);
+    font: inherit; font-size: 12.5px; text-align: left;
+    transition: background 0.2s, transform 0.25s var(--sd-ease), box-shadow 0.2s;
+  }
+  .act:hover { background: var(--sd-hover); }
+  .act:active { transform: scale(0.97); }
+  .act svg { width: 18px; height: 18px; color: var(--sd-ink-2); }
+  .act small { display: block; font-size: 10px; color: var(--sd-ink-3); margin-top: 1px; }
+  /* 危ない操作は 2 回押し。1 回目で帯が伸びて、時間切れで戻る */
+  .act::after {
+    content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+    background: var(--sd-danger); transform-origin: 0 50%; transform: scaleX(0);
+  }
+  .act.armed { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sd-danger) 60%, transparent); }
+  .act.armed svg, .act.armed span { color: var(--sd-danger); }
+  .act.armed::after { animation: drain 3s linear forwards; }
+  @keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  #msg { margin: 8px 2px 0; font-size: 10.5px; color: var(--sd-ink-3); min-height: 15px; }
+</style>
+</head>
+<body>
+  <div class="grid" id="grid"></div>
+  <p id="msg">再起動・シャットダウン・サインアウトは 2 回押すと実行します</p>
+<script type="module">
+  const ICON = {
+    lock: '<path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="5" y="11" width="14" height="10" rx="2.5"/>',
+    sleep: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    restart: '<path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/>',
+    shutdown: '<path d="M12 3.5v8"/><path d="M7.2 6.6a7 7 0 1 0 9.6 0"/>',
+    signout: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M9 8l-4 4 4 4M5 12h10"/>',
+  };
+  const ACTIONS = [
+    ["lock", "ロック", "Win + L と同じ", false],
+    ["sleep", "スリープ", "すぐに復帰できます", false],
+    ["restart", "再起動", "保存していない作業に注意", true],
+    ["shutdown", "シャットダウン", "保存していない作業に注意", true],
+    ["signout", "サインアウト", "アプリはすべて閉じます", true],
+  ];
+  const timers = {};
+  document.getElementById("grid").replaceChildren(...ACTIONS.map(([id, label, sub, confirm]) => {
+    const b = document.createElement("button");
+    b.className = "act";
+    b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICON[id]}</svg><div><span>${label}</span><small>${sub}</small></div>`;
+    b.addEventListener("click", async () => {
+      if (confirm && !b.classList.contains("armed")) {
+        b.classList.add("armed");
+        b.querySelector("small").textContent = "もう一度押すと実行";
+        clearTimeout(timers[id]);
+        timers[id] = setTimeout(() => { b.classList.remove("armed"); b.querySelector("small").textContent = sub; }, 3000);
+        return;
+      }
+      clearTimeout(timers[id]);
+      SideDock.ui.dismiss();
+      try { await SideDock.power.action(id); }
+      catch (e) { document.getElementById("msg").textContent = e.message; }
+    });
+    return b;
+  }));
+  await SideDock.ready;
+</script>
+</body>
+</html>

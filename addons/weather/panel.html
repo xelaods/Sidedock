@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 14px; }
+  .now { display: flex; align-items: center; gap: 12px; }
+  #bigicon { color: var(--sd-ink); }
+  body.sun #bigicon { color: #ffc35a; filter: drop-shadow(0 0 10px rgba(255, 195, 90, 0.4)); }
+  body.moon #bigicon { color: #c9d3ff; }
+  body.rain #bigicon, body.storm #bigicon { color: #7cc0ff; }
+  #temp { font: 600 34px/1 var(--sd-font-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .desc { font-size: 12.5px; }
+  .sub { font-size: 11px; color: var(--sd-ink-3); margin-top: 2px; }
+  .place { margin-left: auto; text-align: right; }
+  .place button { appearance: none; border: 0; background: transparent; color: var(--sd-ink-2); font: inherit; font-size: 11.5px; cursor: default; padding: 2px 6px; border-radius: 6px; }
+  .place button:hover { background: var(--sd-hover); color: var(--sd-ink); }
+
+  .hours { display: flex; gap: 2px; margin-top: 14px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .hour { flex: none; width: 40px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; border-radius: 9px; font-size: 10.5px; color: var(--sd-ink-2); }
+  .hour:first-child { background: var(--sd-surface); color: var(--sd-ink); }
+  .hour b { font: 600 12px/1 var(--sd-font-display); color: var(--sd-ink); }
+  .hour .pop { font-size: 9.5px; color: #7cc0ff; min-height: 12px; }
+
+  .days { margin-top: 10px; }
+  .day { display: grid; grid-template-columns: 44px 22px 36px 1fr; align-items: center; gap: 8px; padding: 4px 2px; font-size: 12px; }
+  .day .name { color: var(--sd-ink-2); }
+  .day .pop { font-size: 10.5px; color: #7cc0ff; text-align: right; }
+  .range { position: relative; height: 4px; border-radius: 2px; background: var(--sd-line); }
+  .range i { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: linear-gradient(90deg, #7cc0ff, #ffc35a); }
+  .range-wrap { display: grid; grid-template-columns: 28px 1fr 28px; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+  .range-wrap span { font-size: 11.5px; } .range-wrap span:first-child { color: var(--sd-ink-3); text-align: right; }
+
+  .setup .sd-input { min-height: 32px; font-size: 12.5px; }
+  .results { margin-top: 6px; }
+  .results button { display: block; width: 100%; text-align: left; appearance: none; border: 0; background: transparent; color: var(--sd-ink); font: inherit; font-size: 12.5px; padding: 6px 8px; border-radius: 8px; cursor: default; }
+  .results button:hover { background: var(--sd-hover); }
+  .results small { color: var(--sd-ink-3); margin-left: 6px; font-size: 11px; }
+  .foot { margin-top: 10px; font-size: 10px; color: var(--sd-ink-3); }
+  #err { color: var(--sd-danger); font-size: 11px; margin-top: 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <div id="view" hidden>
+    <div class="now">
+      <span id="bigicon"></span>
+      <div><div id="temp"></div></div>
+      <div>
+        <div class="desc" id="desc"></div>
+        <div class="sub" id="feel"></div>
+      </div>
+      <div class="place"><button id="change" aria-label="地域を変える"></button></div>
+    </div>
+    <div class="hours" id="hours"></div>
+    <div class="days" id="days"></div>
+    <div class="foot" id="updated"></div>
+  </div>
+  <div id="setup" class="setup" hidden>
+    <label class="sd-label" for="q" style="margin-top:0">天気を見る地域</label>
+    <form id="form" autocomplete="off"><input id="q" class="sd-input" placeholder="市区町村名を入力（例 流山、浦安）" spellcheck="false"></form>
+    <div class="results" id="results"></div>
+  </div>
+  <div id="err"></div>
+<script type="module">
+  import { weather, icon, load, refresh, searchPlace } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  const WEEK = "日月火水木金土";
+  let state = { place: null, cache: null };
+
+  function mode(setup) {
+    $("setup").hidden = !setup;
+    $("view").hidden = setup;
+    if (setup) { $("q").value = ""; $("results").replaceChildren(); SideDock.ui.focus().catch(() => {}); setTimeout(() => $("q").focus(), 50); }
+  }
+
+  function render(d) {
+    if (!d) return;
+    const c = d.current;
+    const w = weather(c.weather_code, c.is_day === 1);
+    document.body.className = w.kind;
+    $("bigicon").innerHTML = icon(w.kind, 40);
+    $("temp").textContent = `${Math.round(c.temperature_2m)}°`;
+    $("desc").textContent = w.label;
+    $("feel").textContent = `体感 ${Math.round(c.apparent_temperature)}°・湿度 ${c.relative_humidity_2m}%・風 ${Math.round(c.wind_speed_10m / 3.6)}m/s`;
+    $("change").textContent = state.place.name;
+
+    // これからの 12 時間
+    const nowIdx = Math.max(0, d.hourly.time.findIndex((t) => new Date(t).getTime() > Date.now() - 3600_000));
+    $("hours").replaceChildren(...d.hourly.time.slice(nowIdx, nowIdx + 12).map((t, k) => {
+      const i = nowIdx + k;
+      const hw = weather(d.hourly.weather_code[i], d.hourly.is_day[i] === 1);
+      const pop = d.hourly.precipitation_probability[i];
+      const el = document.createElement("div");
+      el.className = "hour";
+      el.innerHTML = `<span>${k === 0 ? "今" : new Date(t).getHours() + "時"}</span>${icon(hw.kind, 16)}<b>${Math.round(d.hourly.temperature_2m[i])}°</b><span class="pop">${pop >= 20 ? pop + "%" : ""}</span>`;
+      return el;
+    }));
+
+    // 6 日間。気温の幅は全体の最低〜最高に対する位置で描く
+    const lo = Math.min(...d.daily.temperature_2m_min), hi = Math.max(...d.daily.temperature_2m_max);
+    $("days").replaceChildren(...d.daily.time.map((t, i) => {
+      const dt = new Date(t + "T00:00");
+      const dw = weather(d.daily.weather_code[i]);
+      const mn = d.daily.temperature_2m_min[i], mx = d.daily.temperature_2m_max[i];
+      const pop = d.daily.precipitation_probability_max[i];
+      const el = document.createElement("div");
+      el.className = "day";
+      el.title = dw.label;
+      const left = ((mn - lo) / (hi - lo || 1)) * 100, width = ((mx - mn) / (hi - lo || 1)) * 100;
+      el.innerHTML = `<span class="name">${i === 0 ? "今日" : `${dt.getDate()}日(${WEEK[dt.getDay()]})`}</span>${icon(dw.kind, 16)}<span class="pop">${pop >= 20 ? pop + "%" : ""}</span>
+        <div class="range-wrap"><span>${Math.round(mn)}°</span><div class="range"><i style="left:${left}%;width:${Math.max(width, 4)}%"></i></div><span>${Math.round(mx)}°</span></div>`;
+      return el;
+    }));
+    const at = new Date(state.cache?.at ?? Date.now());
+    $("updated").textContent = `${at.getHours()}:${String(at.getMinutes()).padStart(2, "0")} 更新・Open-Meteo`;
+  }
+
+  async function show(force = false) {
+    $("err").textContent = "";
+    if (!state.place) return mode(true);
+    mode(false);
+    if (state.cache) render(state.cache.data);
+    try { render(await refresh(state, force)); }
+    catch (e) { $("err").textContent = e.message; }
+  }
+
+  $("change").addEventListener("click", () => mode(true));
+  let searchTimer = 0;
+  $("q").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+      const q = $("q").value.trim();
+      if (!q) return $("results").replaceChildren();
+      try {
+        const list = await searchPlace(q);
+        if (!list.length) { const e = document.createElement("div"); e.className = "sd-empty"; e.textContent = "見つかりません"; return $("results").replaceChildren(e); }
+        $("results").replaceChildren(...list.map((p) => {
+          const b = document.createElement("button");
+          b.textContent = p.name;
+          const s = document.createElement("small"); s.textContent = p.detail; b.append(s);
+          b.addEventListener("click", async () => {
+            state = { place: { name: p.name, lat: p.lat, lon: p.lon }, cache: null };
+            await SideDock.storage.set(state);
+            show(true);
+          });
+          return b;
+        }));
+      } catch (e) { $("err").textContent = e.message; }
+    }, 300);
+  });
+  $("form").addEventListener("submit", (e) => { e.preventDefault(); $("results").querySelector("button")?.click(); });
+
+  SideDock.on("storageChanged", (d) => { state = { place: null, cache: null, ...(d ?? {}) }; if (state.cache && !$("view").hidden) render(state.cache.data); });
+  SideDock.on("panelShown", async () => { state = await load(); show(); });
+  await SideDock.ready;
+  state = await load();
+</script>
+</body>
+</html>

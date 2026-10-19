@@ -41,6 +41,10 @@ const PERMISSION_LABELS = {
   browser: "ブラウザでページを開く",
   volume: "音量を変える",
   network: "インターネットに接続する",
+  media: "再生中の音楽を見る・操作する",
+  system: "CPU・メモリ・バッテリーの状態を見る",
+  clipboard: "コピーした文字の履歴を見る",
+  power: "ロック・スリープ・シャットダウンする",
 };
 
 const state = {
@@ -61,7 +65,7 @@ const state = {
   panelRect: null,
   cursor: null,
   dark: true,
-  timers: { dwell: 0, hide: 0, hover: 0, settle: 0 },
+  timers: { dwell: 0, hide: 0, hover: 0, settle: 0, notice: 0 },
 };
 
 // --------------------------------------------------------------------- 共通
@@ -297,6 +301,7 @@ function onSuspend(on) {
 
 function showHint(text, x) {
   const hint = $("#hint");
+  if (hint.classList.contains("notice")) return;
   if (!text || state.active) return hideHint();
   const wasShown = hint.classList.contains("show");
   hint.textContent = text;
@@ -305,7 +310,30 @@ function showHint(text, x) {
   hint.classList.add("show");
 }
 function hideHint() {
-  $("#hint").classList.remove("show", "moving");
+  $("#hint").classList.remove("show", "moving", "notice");
+}
+
+/** カプセルを出して、知らせを数秒表示する */
+function notify(text, ms, frame) {
+  if (state.suspended || !text) return;
+  reveal({ pinned: true });
+  const slot = frame && state.barSlots.get(frame.addonId);
+  const x = slot ? centerOf(slot) : (() => { const c = capsuleRect(); return c.x + c.w / 2; })();
+  requestAnimationFrame(() => {
+    const hint = $("#hint");
+    hint.textContent = text;
+    hint.style.setProperty("--hx", `${Math.round(x)}px`);
+    hint.classList.add("show", "notice");
+  });
+  clearTimer("notice");
+  state.timers.notice = setTimeout(() => {
+    $("#hint").classList.remove("notice");
+    hideHint();
+    if (state.pinned) {
+      state.pinned = false;
+      if (!nearInteractive(state.cursor, LEAVE_PAD) && !state.active) conceal();
+    }
+  }, ms);
 }
 
 /** バーの要素の中心（ウィンドウ座標） */
@@ -610,6 +638,25 @@ const API = {
     run: (f, p) => invoke("browser_open", { browserId: p.browserId || null, url: String(p.url) }),
   },
 
+  "ui.notify": {
+    // カプセルを出して、下に短い知らせを表示する（タイマーの終了など）
+    run: (f, p) => notify(String(p.text ?? "").slice(0, 80), clamp(Number(p.ms) || 4000, 1000, 15000), f),
+  },
+
+  "media.get": { perm: "media", run: () => invoke("media_get") },
+  "media.art": { perm: "media", run: () => invoke("media_art") },
+  "media.control": { perm: "media", run: (f, p) => invoke("media_control", { action: String(p.action) }) },
+  "media.seek": { perm: "media", run: (f, p) => invoke("media_seek", { seconds: Number(p.seconds) || 0 }) },
+
+  "system.stats": { perm: "system", run: () => invoke("system_stats") },
+  "power.action": { perm: "power", run: (f, p) => invoke("power_action", { action: String(p.action) }) },
+
+  "clipboard.list": { perm: "clipboard", run: () => invoke("clipboard_list") },
+  "clipboard.copy": { perm: "clipboard", run: (f, p) => invoke("clipboard_copy", { id: String(p.id) }) },
+  "clipboard.remove": { perm: "clipboard", run: (f, p) => invoke("clipboard_remove", { id: String(p.id) }) },
+  "clipboard.pin": { perm: "clipboard", run: (f, p) => invoke("clipboard_pin", { id: String(p.id), pinned: !!p.pinned }) },
+  "clipboard.clear": { perm: "clipboard", run: () => invoke("clipboard_clear") },
+
   "volume.get": { perm: "volume", run: () => invoke("volume_get") },
   "volume.set": { perm: "volume", run: (f, p) => invoke("volume_set", { level: Number(p.level) }) },
   "volume.setMute": { perm: "volume", run: (f, p) => invoke("volume_set_mute", { muted: !!p.muted }) },
@@ -819,7 +866,7 @@ function renderSettings() {
   root.replaceChildren(
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.2.0" })),
+      el("span", { className: "s-ver", textContent: "0.3.0" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
     el("div", { className: "s-sec", textContent: "アドオン" }),
@@ -877,6 +924,10 @@ async function start() {
       broadcast("drop", { paths: payload.paths }, { permission: "drop" });
     }
   });
+
+  // クリップボードの履歴を使うアドオンが有効なら、起動直後から記録を始める
+  if (enabledAddons().some((a) => a.permissions.includes("clipboard"))) invoke("clipboard_watch").catch(() => {});
+  await listen("clipboard-changed", () => broadcast("clipboardChanged", {}, { permission: "clipboard" }));
 
   await listen("cursor", ({ payload }) => onCursor(payload));
   await listen("suspend", ({ payload }) => onSuspend(!!payload));

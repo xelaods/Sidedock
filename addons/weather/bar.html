@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  #btn { width: auto; min-width: 32px; padding: 0 8px 0 6px; gap: 5px; display: inline-flex; align-items: center; }
+  #btn:hover { transform: none; }
+  #icon svg { display: block; }
+  #temp { font: 600 12.5px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; }
+  #temp:empty { display: none; }
+  body.sun #icon { color: #ffc35a; } body.moon #icon { color: #c9d3ff; } body.rain #icon, body.storm #icon { color: #7cc0ff; }
+</style>
+</head>
+<body>
+  <button id="btn" class="sd-bar-btn" aria-label="天気" data-hint="天気（地域を設定してください）"><span id="icon"></span><span id="temp"></span></button>
+<script type="module">
+  import { weather, icon, load, refresh } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  $("icon").innerHTML = icon("cloud", 17);
+  let state = await (async () => { await SideDock.ready; return load(); })();
+
+  function render(data) {
+    if (!data) { document.body.className = ""; $("temp").textContent = ""; $("icon").innerHTML = icon("cloud", 17); return; }
+    const c = data.current;
+    const w = weather(c.weather_code, c.is_day === 1);
+    document.body.className = w.kind;
+    $("icon").innerHTML = icon(w.kind, 17);
+    $("temp").textContent = `${Math.round(c.temperature_2m)}°`;
+    $("btn").dataset.hint = `${state.place.name}：${w.label} ${Math.round(c.temperature_2m)}°（体感 ${Math.round(c.apparent_temperature)}°）`;
+  }
+  async function tick(force) {
+    try { render(await refresh(state, force)); } catch { /* 通信できないときは前の表示のまま */ }
+  }
+  SideDock.on("storageChanged", (d) => {
+    const moved = d?.place?.lat !== state.place?.lat;
+    state = { place: null, cache: null, ...(d ?? {}) };
+    if (state.cache) render(state.cache.data); else if (!state.place) render(null);
+    if (moved) tick(true);
+  });
+  render(state.cache?.data ?? null);
+  tick();
+  setInterval(() => tick(), 5 * 60_000);
+</script>
+</body>
+</html>

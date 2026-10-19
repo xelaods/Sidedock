@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  #btn { width: auto; min-width: 32px; padding: 0 6px; gap: 6px; display: inline-flex; align-items: center; }
+  #btn:hover { transform: none; }
+  .ring { width: 18px; height: 18px; flex: none; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 2.4; }
+  .ring .bg { stroke: var(--sd-line); }
+  .ring .fg { stroke: var(--sd-accent); stroke-linecap: round; transition: stroke-dashoffset 0.4s linear; filter: drop-shadow(0 0 3px var(--sd-glow)); }
+  body.paused .ring .fg { stroke: var(--sd-ink-3); filter: none; }
+  #left { font: 600 12px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; }
+  body.paused #left { color: var(--sd-ink-3); }
+  body.idle #left, body.idle .ring { display: none; }
+  body:not(.idle) #icon { display: none; }
+  #icon svg { width: 17px; height: 17px; display: block; }
+  /* 残り 10 秒は軽く脈打つ */
+  body.soon #btn { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { background: color-mix(in srgb, var(--sd-accent) 18%, transparent); } }
+</style>
+</head>
+<body class="idle">
+  <button id="btn" class="sd-bar-btn" aria-label="タイマー" data-hint="タイマー">
+    <span id="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="13.5" r="7"/><path d="M12 10v3.5l2.2 1.5M10 3h4"/></svg></span>
+    <svg class="ring" viewBox="0 0 20 20" aria-hidden="true"><circle class="bg" cx="10" cy="10" r="8"/><circle class="fg" id="fg" cx="10" cy="10" r="8" stroke-dasharray="50.27" stroke-dashoffset="0"/></svg>
+    <span id="left"></span>
+  </button>
+<script type="module">
+  import { EMPTY, remaining, running, fmt, load } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  let t = { ...EMPTY };
+
+  function chime() {
+    // 3 回、やわらかく鳴らす（自動再生が許されていないときは鳴らない）
+    try {
+      const ctx = new AudioContext();
+      [0, 0.32, 0.64].forEach((at, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = i === 2 ? 1046.5 : 880;
+        g.gain.setValueAtTime(0, ctx.currentTime + at);
+        g.gain.linearRampToValueAtTime(0.18, ctx.currentTime + at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + at + 0.6);
+        o.connect(g).connect(ctx.destination);
+        o.start(ctx.currentTime + at);
+        o.stop(ctx.currentTime + at + 0.65);
+      });
+      setTimeout(() => ctx.close(), 1600);
+    } catch {}
+  }
+
+  async function finish() {
+    const label = t.label;
+    t = { ...EMPTY };
+    await SideDock.storage.set(t);
+    chime();
+    SideDock.ui.notify(label ? `「${label}」の時間です` : "タイマーが終わりました", 8000);
+    render();
+  }
+
+  function render() {
+    const on = running(t);
+    const left = remaining(t);
+    document.body.classList.toggle("idle", !on);
+    document.body.classList.toggle("paused", t.left != null);
+    document.body.classList.toggle("soon", on && t.left == null && left <= 10_000);
+    if (!on) { $("btn").dataset.hint = "タイマー"; return; }
+    $("left").textContent = fmt(left);
+    $("fg").setAttribute("stroke-dashoffset", String(50.27 * (1 - left / (t.duration || 1))));
+    $("btn").dataset.hint = `${t.label ? t.label + "・" : ""}残り ${fmt(left)}${t.left != null ? "（一時停止中）" : ""}`;
+  }
+
+  setInterval(() => {
+    if (t.endsAt != null && remaining(t) <= 0) finish();
+    else render();
+  }, 250);
+
+  SideDock.on("storageChanged", (d) => { t = { ...EMPTY, ...(d ?? {}) }; render(); });
+  await SideDock.ready;
+  t = await load();
+  // 止めている間に時間が過ぎていたら終わらせる
+  if (t.endsAt != null && remaining(t) <= 0) finish(); else render();
+</script>
+</body>
+</html>

@@ -278,6 +278,14 @@ body.is-suspended #stage { visibility: hidden; }
   transform: translate(-50%, 0) scale(1);
   transition: opacity 0.2s var(--ease) 0.12s, transform 0.4s var(--spring) 0.12s, left 0.32s var(--ease);
 }
+/* アドオンからの知らせ（タイマーの終了など）は少し目立たせる */
+#hint.notice {
+  padding: 5px 12px;
+  font-size: 12px; font-weight: 600;
+  background: color-mix(in srgb, var(--sd-accent) 22%, var(--hint-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sd-accent) 45%, transparent), 0 8px 24px -8px var(--sd-glow);
+  transition-delay: 0s;
+}
 /* 一度出ていれば、隣へ移るときは待たずに滑らせる */
 #hint.show.moving { transition-delay: 0s; }
 

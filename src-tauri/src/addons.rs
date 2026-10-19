@@ -12,7 +12,18 @@ use tauri::{
 };
 
 /// アドオンが要求できる権限
-pub const KNOWN_PERMISSIONS: &[&str] = &["app", "dialog", "drop", "browser", "volume", "network"];
+pub const KNOWN_PERMISSIONS: &[&str] = &[
+    "app",
+    "dialog",
+    "drop",
+    "browser",
+    "volume",
+    "network",
+    "media",
+    "system",
+    "clipboard",
+    "power",
+];
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -49,6 +60,9 @@ struct Manifest {
     panel: Option<Slot>,
     #[serde(default)]
     permissions: Vec<String>,
+    /// 同梱アドオンを最初から有効にするか（省略時は有効）
+    #[serde(default)]
+    default_enabled: Option<bool>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -65,6 +79,8 @@ pub struct AddonInfo {
     pub permissions: Vec<String>,
     /// 本体に同梱されたアドオンか
     pub builtin: bool,
+    #[serde(skip)]
+    pub default_enabled: bool,
     #[serde(skip)]
     pub dir: PathBuf,
 }
@@ -123,6 +139,7 @@ fn read_manifest(dir: &Path, builtin: bool) -> Result<AddonInfo, String> {
         panel: m.panel,
         permissions,
         builtin,
+        default_enabled: m.default_enabled.unwrap_or(true),
         dir: dir.to_path_buf(),
     })
 }

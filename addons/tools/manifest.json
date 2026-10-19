@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.tools",
+  "name": "クイックツール",
+  "version": "1.0.0",
+  "description": "スクリーンショット・設定・タスクマネージャーなどをすぐ開けます",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "クイックツール", "width": 288 },
+  "permissions": ["app"],
+  "defaultEnabled": false
+}

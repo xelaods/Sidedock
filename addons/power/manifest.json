@@ -1,0 +1,17 @@
+{
+  "id": "sidedock.power",
+  "name": "電源",
+  "version": "1.0.0",
+  "description": "ロック・スリープ・再起動・シャットダウン",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": {
+    "entry": "panel.html",
+    "title": "電源",
+    "width": 290
+  },
+  "permissions": [
+    "power"
+  ],
+  "defaultEnabled": false
+}

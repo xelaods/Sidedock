@@ -48,14 +48,15 @@ html, body {
   user-select: none;
   overflow: hidden;
 }
-/* バー：高さ 32px の横並び。幅は中身に合わせて本体が自動で調整する */
-:root[data-slot="bar"] body {
+/* バー：高さ 32px の横並び。幅は中身に合わせて本体が自動で調整する
+   （:where で詳しさを 0 にして、アドオン側の body { ... } で上書きできるようにする） */
+:where(:root[data-slot="bar"]) body {
   display: flex; align-items: center; gap: 2px;
   width: max-content; height: 32px;
   white-space: nowrap;
 }
 /* パネル：高さは中身に合わせて本体が自動で調整する */
-:root[data-slot="panel"] body { padding: 14px; }
+:where(:root[data-slot="panel"]) body { padding: 14px; }
 
 :focus { outline: none; }
 :focus-visible { outline: 2px solid var(--sd-accent); outline-offset: 1px; }

@@ -3,11 +3,24 @@
 画面の上端に隠れていて、カーソルを近づけるとヌルっと出てくる、Windows 用のコンパクトなランチャーです。
 画面の大きさ（作業領域）は変えず、いま開いているアプリの上に重なって出てきます。全画面のアプリ（動画・ゲーム・F11 のブラウザなど）を使っている間は出てきません。
 
-- **アプリのショートカット**：よく使うアプリやフォルダを並べる（カプセルにドラッグ＆ドロップでも追加）
-- **検索**：近づけると検索欄が開き、そのまま打ち込める。ブラウザと検索エンジンを選べる
-- **音量**：スクロールで調整、近づけるとスライダー、クリックでミュート
-- **時計**：日付と時刻
-- **アドオン**：上の機能もすべてアドオンとして作られていて、自分でも追加できる
+同梱のアドオン（設定でオン/オフ・並べ替えできます。★は最初から有効）
+
+| アドオン | できること |
+| --- | --- |
+| ★ 時計 | 日付と時刻 |
+| ★ 再生中の音楽 | Spotify・Apple Music・YouTube などの曲名とジャケット、再生/一時停止・曲送り・再生位置の変更。カプセルの上でホイールを回すと曲送り |
+| ★ アプリのショートカット | よく使うアプリやフォルダを並べる（ドラッグ＆ドロップでも追加） |
+| ★ 検索 | 近づけると検索欄が開き、そのまま打ち込める。ブラウザと検索エンジンを選べる |
+| ★ クリップボード履歴 | コピーした文字を最大 60 件覚えておく。ピン留め・絞り込み。パスワード管理アプリからのコピーは記録しない |
+| ★ メモ | 3 枚のメモ。自動で保存 |
+| ★ 音量 | スクロールで調整、近づけるとスライダー、クリックでミュート |
+| タイマー | 残り時間がカプセルに出る。終わると音と知らせ |
+| システムモニター | CPU・メモリ・ディスク・バッテリー |
+| 電卓 | 式をそのまま打ち込める（キーボードでも） |
+| 天気 | 今の気温と 6 日間の予報（Open-Meteo） |
+| カレンダー | 月のカレンダーと日本の祝日 |
+| 電源 | ロック・スリープ・再起動・シャットダウン・サインアウト（危ないものは 2 回押し） |
+| クイックツール | スクショ・設定・タスク管理・ごみ箱・Wi-Fi などをすぐ開く |
 
 技術：Tauri 2（Rust）＋ HTML/CSS/JS。メモリが軽く、UI とアドオンは Web 技術で書けます。
 
@@ -92,6 +105,10 @@ my-addon/
 | `browser` | `SideDock.browser.list()` でブラウザ一覧、`browser.open(url, browserId)` でページを開く |
 | `volume` | `SideDock.volume.get()` / `set(0〜1)` / `setMute(true/false)` |
 | `network` | インターネットへの接続（ないと外部のサーバーへの通信はすべて止められる） |
+| `media` | `SideDock.media.get()` / `art()` / `control("toggle" \| "next" \| "prev" …)` / `seek(秒)` |
+| `system` | `SideDock.system.stats()` で CPU・メモリ・ディスク・バッテリー |
+| `clipboard` | `SideDock.clipboard.list()` / `copy(id)` / `pin(id, true)` / `remove(id)` / `clear()`、`clipboardChanged` イベント |
+| `power` | `SideDock.power.action("lock" \| "sleep" \| "restart" \| "shutdown" \| "signout")` |
 
 権限がなくても、`SideDock.storage.get()` / `set(data)` でアドオン専用の保存領域（JSON）が使えます。
 
@@ -122,7 +139,8 @@ my-addon/
 - 部品のクラス：`sd-btn`（`primary` `ghost` `icon`）、`sd-input`、`sd-select`、`sd-range`、`sd-bar-btn`（カプセル用の丸いボタン 32×32）
 - ウィジェットの幅・パネルの高さは中身に合わせて自動で伸び縮みする
 - 要素に `data-hint="説明"` を付けると、カーソルを乗せたときカプセルの下に説明が出る
-- UI の操作：`ui.openPanel()` `ui.closePanel()` `ui.togglePanel()` `ui.focus()`（キーボード入力を受け取る）`ui.dismiss()`（引っ込める）
+- UI の操作：`ui.openPanel()` `ui.closePanel()` `ui.togglePanel()` `ui.focus()`（キーボード入力を受け取る）`ui.dismiss()`（引っ込める）`ui.notify(文字, ミリ秒)`（カプセルを出して知らせる）
+- manifest.json に `"defaultEnabled": false` と書くと、最初はオフの状態で一覧に出る
 - イベント：`init` `theme` `panelShown` `panelHidden` `storageChanged` `drop` `revealed` `concealed`
 - アドオンはサンドボックス化された iframe で動き、本体とは `postMessage` 経由でしかやり取りできない。`alert()` などのダイアログは使えない
 
@@ -133,6 +151,10 @@ src/                本体の UI（カプセル、パネル、設定、アドオ
 src-tauri/src/
   lib.rs            起動、タスクトレイ、コマンド
   overlay.rs        画面上部への重ね表示、カーソルの監視、全画面の検出
+  media.rs          再生中のメディア（Windows のメディアコントロール）
+  sysmon.rs         CPU・メモリ・バッテリー、電源の操作
+  clipboard.rs      クリップボードの履歴
+  log.rs            診断ログ
   system.rs         音量、アプリ起動、アイコン取得、ブラウザ一覧
   addons.rs         アドオンの読み込み、addon:// の配信、保存領域
   config.rs         設定ファイル

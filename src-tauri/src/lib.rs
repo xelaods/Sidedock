@@ -1,7 +1,10 @@
 mod addons;
+mod clipboard;
 mod config;
 mod log;
+mod media;
 mod overlay;
+mod sysmon;
 mod system;
 
 use addons::AddonInfo;
@@ -50,8 +53,12 @@ fn reload(app: &AppHandle) -> InitData {
         // 同梱アドオンの初期の並び順
         let preferred = [
             "sidedock.clock",
+            "sidedock.media",
             "sidedock.shortcuts",
             "sidedock.search",
+            "sidedock.clipboard",
+            "sidedock.notes",
+            "sidedock.timer",
             "sidedock.volume",
         ];
         ids.sort_by_key(|id| preferred.iter().position(|p| p == id).unwrap_or(usize::MAX));
@@ -59,7 +66,7 @@ fn reload(app: &AppHandle) -> InitData {
         for id in ids {
             if !c.addons.iter().any(|a| a.id == id) {
                 // 同梱は最初から有効。自分で入れたアドオンは権限を確認してから有効にしてもらう
-                let enabled = found[&id].builtin;
+                let enabled = found[&id].builtin && found[&id].default_enabled;
                 c.addons.push(AddonEntry { id, enabled });
                 changed = true;
             }
@@ -230,6 +237,67 @@ fn volume_set_mute(muted: bool) -> Result<(), String> {
     system::volume_set_mute(muted)
 }
 
+#[tauri::command(async)]
+fn media_get() -> Result<Option<media::MediaInfo>, String> {
+    media::get()
+}
+
+#[tauri::command(async)]
+fn media_art() -> Result<Option<String>, String> {
+    media::art()
+}
+
+#[tauri::command(async)]
+fn media_control(action: String) -> Result<(), String> {
+    media::control(&action)
+}
+
+#[tauri::command(async)]
+fn media_seek(seconds: f64) -> Result<(), String> {
+    media::seek(seconds)
+}
+
+#[tauri::command(async)]
+fn system_stats() -> sysmon::Stats {
+    sysmon::stats()
+}
+
+#[tauri::command(async)]
+fn power_action(action: String) -> Result<(), String> {
+    sysmon::power(&action)
+}
+
+#[tauri::command]
+fn clipboard_watch(app: AppHandle) {
+    clipboard::start(app);
+}
+
+#[tauri::command]
+fn clipboard_list(app: AppHandle) -> Vec<clipboard::Clip> {
+    clipboard::start(app);
+    clipboard::list()
+}
+
+#[tauri::command(async)]
+fn clipboard_copy(app: AppHandle, id: String) -> Result<(), String> {
+    clipboard::copy(&app, &id)
+}
+
+#[tauri::command]
+fn clipboard_remove(app: AppHandle, id: String) {
+    clipboard::remove(&app, &id);
+}
+
+#[tauri::command]
+fn clipboard_pin(app: AppHandle, id: String, pinned: bool) {
+    clipboard::pin(&app, &id, pinned);
+}
+
+#[tauri::command]
+fn clipboard_clear(app: AppHandle) {
+    clipboard::clear(&app);
+}
+
 // =============================================================================
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -345,6 +413,18 @@ pub fn run() {
             volume_get,
             volume_set,
             volume_set_mute,
+            media_get,
+            media_art,
+            media_control,
+            media_seek,
+            system_stats,
+            power_action,
+            clipboard_watch,
+            clipboard_list,
+            clipboard_copy,
+            clipboard_remove,
+            clipboard_pin,
+            clipboard_clear,
         ])
         .build(tauri::generate_context!())
         .expect("SideDock の起動に失敗しました");

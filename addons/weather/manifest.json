@@ -1,0 +1,12 @@
+{
+  "id": "sidedock.weather",
+  "name": "天気",
+  "version": "1.0.0",
+  "description": "今の気温と、この先の天気（Open-Meteo を利用）",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "panel": { "entry": "panel.html", "title": "天気", "width": 320 },
+  "permissions": ["network"],
+  "defaultEnabled": false
+}

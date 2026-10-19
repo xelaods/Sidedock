@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 12px 12px 10px; }
+  .head { display: flex; align-items: center; gap: 4px; margin: 0 2px 8px; }
+  #title { font: 600 15px/1 var(--sd-font-display); flex: 1; }
+  #title small { font-size: 11.5px; font-weight: 500; color: var(--sd-ink-3); margin-left: 4px; }
+  .nav { width: 26px; min-height: 26px; height: 26px; padding: 0; border-radius: 8px; }
+  .nav svg { width: 12px; height: 12px; }
+  #today { min-height: 26px; font-size: 11px; padding: 0 8px; border-radius: 8px; }
+  .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+  .wd { font-size: 10px; color: var(--sd-ink-3); padding: 2px 0 4px; }
+  .wd.sun, .d.sun, .d.hol { color: #ff8a8a; }
+  .wd.sat, .d.sat { color: #8cc8ff; }
+  :root[data-theme="light"] .wd.sun, :root[data-theme="light"] .d.sun, :root[data-theme="light"] .d.hol { color: #d93a3a; }
+  :root[data-theme="light"] .wd.sat, :root[data-theme="light"] .d.sat { color: #1f6fd1; }
+  .d {
+    position: relative; height: 30px; display: grid; place-items: center;
+    font: 500 12.5px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; border-radius: 9px;
+  }
+  .d.out { opacity: 0.28; }
+  .d.today { background: var(--sd-accent); color: var(--sd-accent-ink) !important; font-weight: 700; box-shadow: 0 4px 12px -4px var(--sd-glow); }
+  .d.hol::after { content: ""; position: absolute; bottom: 4px; width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+  .d.today.hol::after { background: var(--sd-accent-ink); }
+  .list { margin-top: 8px; padding-top: 8px; box-shadow: inset 0 1px 0 var(--sd-line); font-size: 11.5px; }
+  .list div { display: flex; gap: 8px; padding: 2px 2px; color: var(--sd-ink-2); }
+  .list b { font-weight: 600; color: #ff8a8a; width: 38px; flex: none; font-variant-numeric: tabular-nums; }
+  :root[data-theme="light"] .list b { color: #d93a3a; }
+  .list:empty { display: none; }
+  .grid.slide-l { animation: sl 0.35s var(--sd-ease); } .grid.slide-r { animation: sr 0.35s var(--sd-ease); }
+  @keyframes sl { from { transform: translateX(14px); opacity: 0; } } @keyframes sr { from { transform: translateX(-14px); opacity: 0; } }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div id="title"></div>
+    <button id="today" class="sd-btn ghost">今日</button>
+    <button id="prev" class="sd-btn ghost nav" aria-label="前の月"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"/></svg></button>
+    <button id="next" class="sd-btn ghost nav" aria-label="次の月"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5L8 6l-3.5 3.5"/></svg></button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="list" id="list"></div>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const WEEK = "日月火水木金土";
+  let view = new Date(); view.setDate(1);
+  let holidays = {};
+
+  const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  function render(dir) {
+    const y = view.getFullYear(), m = view.getMonth();
+    const wareki = y >= 2019 ? `令和${y - 2018 === 1 ? "元" : y - 2018}年` : "";
+    $("title").innerHTML = `${y}年 ${m + 1}月<small>${wareki}</small>`;
+    const first = new Date(y, m, 1);
+    const start = new Date(y, m, 1 - first.getDay());
+    const today = key(new Date());
+    const cells = [...WEEK].map((w, i) => {
+      const e = document.createElement("div");
+      e.className = `wd${i === 0 ? " sun" : i === 6 ? " sat" : ""}`;
+      e.textContent = w;
+      return e;
+    });
+    const weeks = Math.ceil((first.getDay() + new Date(y, m + 1, 0).getDate()) / 7);
+    for (let i = 0; i < weeks * 7; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      const k = key(d);
+      const e = document.createElement("div");
+      const cls = ["d"];
+      if (d.getMonth() !== m) cls.push("out");
+      if (d.getDay() === 0) cls.push("sun");
+      if (d.getDay() === 6) cls.push("sat");
+      if (holidays[k]) { cls.push("hol"); e.title = holidays[k]; }
+      if (k === today) cls.push("today");
+      e.className = cls.join(" ");
+      e.textContent = d.getDate();
+      cells.push(e);
+    }
+    $("grid").replaceChildren(...cells);
+    if (dir) { $("grid").className = "grid"; void $("grid").offsetWidth; $("grid").className = `grid slide-${dir}`; }
+    const prefix = `${y}-${String(m + 1).padStart(2, "0")}`;
+    $("list").replaceChildren(...Object.entries(holidays).filter(([k]) => k.startsWith(prefix)).sort().map(([k, name]) => {
+      const e = document.createElement("div");
+      const d = new Date(k + "T00:00");
+      e.innerHTML = `<b>${d.getDate()}日(${WEEK[d.getDay()]})</b><span></span>`;
+      e.lastChild.textContent = name;
+      return e;
+    }));
+  }
+
+  async function loadHolidays() {
+    const saved = await SideDock.storage.get();
+    if (saved?.holidays) { holidays = saved.holidays; render(); }
+    // 1 日 1 回だけ取り直す
+    if (saved?.at && Date.now() - saved.at < 86400_000) return;
+    try {
+      const res = await fetch("https://holidays-jp.github.io/api/v1/date.json");
+      if (!res.ok) return;
+      holidays = await res.json();
+      await SideDock.storage.set({ at: Date.now(), holidays });
+      render();
+    } catch {}
+  }
+
+  $("prev").addEventListener("click", () => { view.setMonth(view.getMonth() - 1); render("r"); });
+  $("next").addEventListener("click", () => { view.setMonth(view.getMonth() + 1); render("l"); });
+  $("today").addEventListener("click", () => { view = new Date(); view.setDate(1); render(); });
+  document.addEventListener("wheel", (e) => { if (Math.abs(e.deltaY) > 20) (e.deltaY > 0 ? $("next") : $("prev")).click(); }, { passive: true });
+  SideDock.on("panelShown", () => { view = new Date(); view.setDate(1); render(); });
+
+  await SideDock.ready;
+  render();
+  loadHolidays();
+</script>
+</body>
+</html>

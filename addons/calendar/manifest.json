@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.calendar",
+  "name": "カレンダー",
+  "version": "1.0.0",
+  "description": "月のカレンダーと日本の祝日",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "カレンダー", "width": 280 },
+  "permissions": ["network"],
+  "defaultEnabled": false
+}

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 0; }
+  .wrap { position: relative; padding: 14px; overflow: hidden; }
+  /* ジャケットをぼかして背景に敷く */
+  #glow {
+    position: absolute; inset: -40px; z-index: -1;
+    background: center / cover no-repeat;
+    filter: blur(36px) saturate(1.6);
+    opacity: 0; transform: scale(1.1);
+    transition: opacity 0.8s var(--sd-ease), background-image 0.6s;
+  }
+  #glow.on { opacity: 0.38; }
+  :root[data-theme="light"] #glow.on { opacity: 0.3; }
+
+  .top { display: flex; gap: 12px; align-items: center; }
+  .art {
+    flex: none; width: 72px; height: 72px; border-radius: 12px;
+    background: var(--sd-surface) center / cover no-repeat;
+    box-shadow: inset 0 0 0 1px var(--sd-line), 0 10px 24px -8px rgba(0, 0, 0, 0.6);
+    display: grid; place-items: center; color: var(--sd-ink-3);
+    transition: transform 0.5s var(--sd-ease), filter 0.5s;
+  }
+  .art svg { width: 28px; height: 28px; }
+  body.paused .art { transform: scale(0.94); filter: saturate(0.5); }
+  .meta { min-width: 0; flex: 1; }
+  .title { font: 600 14.5px/1.3 var(--sd-font-display); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .artist { margin-top: 2px; font-size: 12px; color: var(--sd-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app { margin-top: 6px; font-size: 10.5px; color: var(--sd-ink-3); display: flex; align-items: center; gap: 5px; }
+  .app i { width: 6px; height: 6px; border-radius: 50%; background: var(--sd-accent); box-shadow: 0 0 6px var(--sd-glow); }
+  body.paused .app i { background: var(--sd-ink-3); box-shadow: none; }
+
+  .timeline { margin-top: 14px; }
+  .bar {
+    position: relative; height: 16px; display: flex; align-items: center; cursor: default;
+  }
+  .track { position: relative; width: 100%; height: 4px; border-radius: 2px; background: var(--sd-line); overflow: hidden; transition: height 0.2s var(--sd-ease); }
+  .bar:hover .track { height: 6px; }
+  .fill { position: absolute; inset: 0; transform-origin: 0 50%; transform: scaleX(var(--p, 0)); background: var(--sd-ink); border-radius: inherit; }
+  .bar:hover .fill { background: var(--sd-accent); }
+  .bar.disabled { pointer-events: none; opacity: 0.4; }
+  .times { display: flex; justify-content: space-between; margin-top: 2px; font-size: 10.5px; color: var(--sd-ink-3); font-variant-numeric: tabular-nums; }
+
+  .controls { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 6px; }
+  .controls button {
+    appearance: none; border: 0; background: transparent; color: var(--sd-ink);
+    display: grid; place-items: center; width: 38px; height: 38px; border-radius: 19px; cursor: default;
+    transition: background 0.2s, transform 0.3s var(--sd-ease);
+  }
+  .controls button:hover { background: var(--sd-hover); }
+  .controls button:active { transform: scale(0.9); transition-duration: 0.08s; }
+  .controls button:disabled { opacity: 0.3; pointer-events: none; }
+  .controls svg { width: 20px; height: 20px; }
+  #toggle { width: 48px; height: 48px; border-radius: 24px; background: var(--sd-ink); color: var(--sd-surface-2); }
+  :root[data-theme="dark"] #toggle { color: #111318; }
+  :root[data-theme="light"] #toggle { color: #fff; }
+  #toggle:hover { background: var(--sd-ink); transform: scale(1.05); }
+  #toggle svg { width: 22px; height: 22px; }
+
+  #empty { padding: 26px 14px; text-align: center; color: var(--sd-ink-2); font-size: 12.5px; }
+  #empty svg { width: 26px; height: 26px; color: var(--sd-ink-3); display: block; margin: 0 auto 8px; }
+  #empty small { display: block; margin-top: 4px; color: var(--sd-ink-3); font-size: 11px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <div id="empty"></div>
+  <div class="wrap" id="player" hidden>
+    <div id="glow"></div>
+    <div class="top">
+      <div class="art" id="art"></div>
+      <div class="meta">
+        <div class="title" id="title"></div>
+        <div class="artist" id="artist"></div>
+        <div class="app"><i></i><span id="app"></span></div>
+      </div>
+    </div>
+    <div class="timeline">
+      <div class="bar" id="seek" role="slider" aria-label="再生位置" tabindex="0"><div class="track"><div class="fill" id="fill"></div></div></div>
+      <div class="times"><span id="pos">0:00</span><span id="dur">0:00</span></div>
+    </div>
+    <div class="controls">
+      <button id="prev" aria-label="前の曲"></button>
+      <button id="toggle" aria-label="再生・一時停止"></button>
+      <button id="next" aria-label="次の曲"></button>
+    </div>
+  </div>
+<script type="module">
+  import { ICONS, appName, time, watch } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  $("empty").innerHTML = `${ICONS.note}再生中のメディアはありません<small>Spotify や YouTube などで再生すると、ここで操作できます</small>`;
+  $("prev").innerHTML = ICONS.prev;
+  $("next").innerHTML = ICONS.next;
+
+  let info = null;
+  let shownAt = 0; // 最後に情報を受け取った時刻（位置をなめらかに進めるため）
+
+  function render(i, art) {
+    info = i;
+    shownAt = performance.now();
+    $("empty").hidden = !!i;
+    $("player").hidden = !i;
+    if (!i) return;
+    const playing = i.status === "playing";
+    document.body.classList.toggle("paused", !playing);
+    $("title").textContent = i.title || "不明な曲";
+    $("artist").textContent = [i.artist, i.album].filter(Boolean).join(" · ") || " ";
+    $("app").textContent = `${appName(i.app)}${playing ? "で再生中" : "・一時停止中"}`;
+    $("art").style.backgroundImage = art ? `url("${art}")` : "";
+    $("art").innerHTML = art ? "" : ICONS.note;
+    $("glow").style.backgroundImage = art ? `url("${art}")` : "";
+    $("glow").classList.toggle("on", !!art);
+    $("toggle").innerHTML = playing ? ICONS.pause : ICONS.play;
+    $("toggle").setAttribute("aria-label", playing ? "一時停止" : "再生");
+    $("prev").disabled = !i.canPrev;
+    $("next").disabled = !i.canNext;
+    $("seek").classList.toggle("disabled", !(i.canSeek && i.duration > 0));
+    $("dur").textContent = time(i.duration);
+  }
+
+  // 再生位置は 1 秒ごとの情報の間もなめらかに進める
+  function frame() {
+    if (info && !dragging) {
+      const extra = info.status === "playing" ? (performance.now() - shownAt) / 1000 : 0;
+      const pos = Math.min(info.duration, info.position + extra);
+      $("fill").style.setProperty("--p", info.duration ? pos / info.duration : 0);
+      $("pos").textContent = time(pos);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  let w = null;
+  SideDock.on("panelShown", () => { w?.stop(); w = watch(render, 1000); });
+  SideDock.on("panelHidden", () => { w?.stop(); w = null; });
+
+  const act = async (a) => {
+    await SideDock.media.control(a).catch(() => {});
+    setTimeout(() => w?.now(), 300);
+  };
+  $("toggle").addEventListener("click", () => act("toggle"));
+  $("prev").addEventListener("click", () => act("prev"));
+  $("next").addEventListener("click", () => act("next"));
+
+  // ドラッグで再生位置を変える
+  let dragging = false;
+  const ratioAt = (e) => {
+    const r = $("seek").getBoundingClientRect();
+    return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  };
+  $("seek").addEventListener("pointerdown", (e) => {
+    if (!info?.duration) return;
+    dragging = true;
+    $("seek").setPointerCapture(e.pointerId);
+    $("fill").style.setProperty("--p", ratioAt(e));
+    $("pos").textContent = time(ratioAt(e) * info.duration);
+  });
+  $("seek").addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    $("fill").style.setProperty("--p", ratioAt(e));
+    $("pos").textContent = time(ratioAt(e) * info.duration);
+  });
+  $("seek").addEventListener("pointerup", async (e) => {
+    if (!dragging) return;
+    dragging = false;
+    const sec = ratioAt(e) * info.duration;
+    info.position = sec;
+    shownAt = performance.now();
+    await SideDock.media.seek(sec).catch(() => {});
+    setTimeout(() => w?.now(), 300);
+  });
+  $("seek").addEventListener("keydown", (e) => {
+    if (!info?.duration || !["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+    const sec = Math.max(0, info.position + (e.key === "ArrowRight" ? 10 : -10));
+    SideDock.media.seek(sec).then(() => setTimeout(() => w?.now(), 300)).catch(() => {});
+  });
+
+  await SideDock.ready;
+  render(null, null);
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "id": "sidedock.notes",
+  "name": "メモ",
+  "version": "1.0.0",
+  "description": "ちょっとしたメモをすぐに書き留められます。自動で保存されます",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "メモ", "width": 320 },
+  "permissions": []
+}

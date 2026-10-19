@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 14px; }
+  .face { text-align: center; margin: 2px 0 12px; }
+  #time {
+    font: 600 38px/1 var(--sd-font-display); letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.3s;
+  }
+  body.paused #time { color: var(--sd-ink-3); }
+  #label { margin-top: 4px; font-size: 11.5px; color: var(--sd-ink-2); min-height: 17px; }
+  .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .presets .sd-btn { min-height: 34px; flex-direction: column; gap: 0; line-height: 1.15; }
+  .presets .sd-btn b { font: 600 13px/1.2 var(--sd-font-display); }
+  .presets .sd-btn small { font-size: 9.5px; color: var(--sd-ink-3); }
+  .custom { display: flex; gap: 6px; margin-top: 8px; }
+  .custom .sd-input { min-height: 30px; font-size: 12px; }
+  .custom .sd-btn { flex: none; min-height: 30px; }
+  .run { display: flex; gap: 6px; }
+  .run .sd-btn { flex: 1; min-height: 34px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="face">
+    <div id="time">0:00</div>
+    <div id="label"></div>
+  </div>
+  <div id="setup">
+    <div class="presets" id="presets"></div>
+    <form class="custom" id="custom" autocomplete="off">
+      <input id="min" class="sd-input" inputmode="decimal" placeholder="分を入力（例 7 や 1.5）" aria-label="分">
+      <button class="sd-btn primary" type="submit">開始</button>
+    </form>
+  </div>
+  <div class="run" id="run" hidden>
+    <button id="pause" class="sd-btn"></button>
+    <button id="add" class="sd-btn">＋1 分</button>
+    <button id="cancel" class="sd-btn ghost">やめる</button>
+  </div>
+<script type="module">
+  import { EMPTY, remaining, running, fmt, load } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  const PRESETS = [
+    [1, "1 分", ""], [3, "3 分", "カップ麺"], [5, "5 分", "休けい"],
+    [10, "10 分", ""], [25, "25 分", "集中"], [60, "60 分", ""],
+  ];
+  let t = { ...EMPTY };
+
+  const save = () => SideDock.storage.set(t);
+  function start(min, label = "") {
+    const ms = Math.round(min * 60_000);
+    if (!(ms > 0)) return;
+    t = { endsAt: Date.now() + ms, duration: ms, left: null, label };
+    save(); render();
+  }
+
+  $("presets").replaceChildren(...PRESETS.map(([m, txt, sub]) => {
+    const b = document.createElement("button");
+    b.className = "sd-btn";
+    b.innerHTML = `<b>${txt}</b>${sub ? `<small>${sub}</small>` : ""}`;
+    b.addEventListener("click", () => start(m, sub));
+    return b;
+  }));
+  $("custom").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = parseFloat($("min").value.replace(/[^\d.]/g, ""));
+    if (v > 0 && v <= 24 * 60) { start(v); $("min").value = ""; }
+  });
+  $("pause").addEventListener("click", () => {
+    if (t.left != null) { t = { ...t, endsAt: Date.now() + t.left, left: null }; }
+    else { t = { ...t, left: remaining(t), endsAt: null }; }
+    save(); render();
+  });
+  $("add").addEventListener("click", () => {
+    if (t.left != null) t.left += 60_000; else t.endsAt += 60_000;
+    t.duration += 60_000;
+    save(); render();
+  });
+  $("cancel").addEventListener("click", () => { t = { ...EMPTY }; save(); render(); });
+
+  function render() {
+    const on = running(t);
+    $("setup").hidden = on;
+    $("run").hidden = !on;
+    document.body.classList.toggle("paused", t.left != null);
+    $("time").textContent = on ? fmt(remaining(t)) : "0:00";
+    $("label").textContent = on ? (t.label || "") + (t.left != null ? "（一時停止中）" : "") : "時間を選んでください";
+    $("pause").textContent = t.left != null ? "再開" : "一時停止";
+  }
+  setInterval(render, 250);
+
+  SideDock.on("storageChanged", (d) => { t = { ...EMPTY, ...(d ?? {}) }; render(); });
+  SideDock.on("panelShown", async () => { t = await load(); render(); });
+  await SideDock.ready;
+  t = await load();
+  render();
+</script>
+</body>
+</html>

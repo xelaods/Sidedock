@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 10px; }
+  .tabs { display: flex; gap: 3px; margin-bottom: 8px; }
+  .tabs button {
+    appearance: none; border: 0; background: transparent; color: var(--sd-ink-3);
+    font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 8px; cursor: default;
+    transition: background 0.18s, color 0.18s;
+  }
+  .tabs button:hover { color: var(--sd-ink); background: var(--sd-hover); }
+  .tabs button[aria-pressed="true"] { color: var(--sd-ink); background: var(--sd-surface); box-shadow: inset 0 0 0 1px var(--sd-line); }
+  textarea {
+    display: block; width: 100%; height: 220px; resize: none;
+    padding: 10px 12px; border: 0; border-radius: 12px;
+    background: var(--sd-surface-2); color: var(--sd-ink);
+    box-shadow: inset 0 0 0 1px var(--sd-line);
+    font: 13px/1.65 var(--sd-font); user-select: text;
+    scrollbar-width: thin; scrollbar-color: var(--sd-line) transparent;
+    transition: box-shadow 0.2s;
+  }
+  textarea:focus { outline: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sd-accent) 60%, transparent); }
+  textarea::placeholder { color: var(--sd-ink-3); }
+  .foot { display: flex; justify-content: space-between; margin: 6px 2px 0; font-size: 10.5px; color: var(--sd-ink-3); }
+  #saved { transition: opacity 0.4s; }
+</style>
+</head>
+<body>
+  <div class="tabs" id="tabs" role="group" aria-label="メモの切り替え"></div>
+  <textarea id="text" placeholder="ここに書くと自動で保存されます" spellcheck="false"></textarea>
+  <div class="foot"><span id="count"></span><span id="saved"></span></div>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const NAMES = ["メモ 1", "メモ 2", "メモ 3"];
+  let data = { current: 0, notes: ["", "", ""] };
+  let timer = 0;
+
+  function renderTabs() {
+    $("tabs").replaceChildren(...NAMES.map((n, i) => {
+      const b = document.createElement("button");
+      const first = (data.notes[i] || "").split("\n")[0].trim();
+      b.textContent = first ? first.slice(0, 8) : n;
+      b.setAttribute("aria-pressed", String(i === data.current));
+      b.addEventListener("click", () => { data.current = i; show(); persist(); $("text").focus(); });
+      return b;
+    }));
+  }
+  function show() {
+    $("text").value = data.notes[data.current] || "";
+    count();
+    renderTabs();
+  }
+  function count() {
+    $("count").textContent = `${$("text").value.length} 文字`;
+  }
+  function persist() {
+    SideDock.storage.set(data);
+  }
+
+  $("text").addEventListener("input", () => {
+    data.notes[data.current] = $("text").value;
+    count();
+    $("saved").textContent = "";
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      persist();
+      renderTabs();
+      $("saved").textContent = "保存しました";
+    }, 400);
+  });
+
+  SideDock.on("panelShown", async () => {
+    await SideDock.ui.focus().catch(() => {});
+    $("text").focus();
+  });
+
+  await SideDock.ready;
+  const saved = await SideDock.storage.get();
+  if (saved?.notes) data = { current: saved.current ?? 0, notes: [...saved.notes, "", "", ""].slice(0, 3) };
+  show();
+</script>
+</body>
+</html>

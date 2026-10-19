@@ -34,9 +34,13 @@
     });
   }
 
+  // パネルが今開いているか。あとから on("panelShown") したときにもすぐ知らせるため
+  let panelOpen = false;
+
   function on(name, fn) {
     if (!handlers.has(name)) handlers.set(name, new Set());
     handlers.get(name).add(fn);
+    if (name === "panelShown" && panelOpen) queueMicrotask(() => fn({}));
     return () => handlers.get(name)?.delete(fn);
   }
 
@@ -58,6 +62,8 @@
     } else if (d.type === "event") {
       if (d.name === "init") context = d.data;
       if (d.name === "init" || d.name === "theme") applyTheme(d.data.dark);
+      if (d.name === "panelShown") panelOpen = true;
+      if (d.name === "panelHidden") panelOpen = false;
       emit(d.name, d.data);
     }
   });
@@ -126,7 +132,7 @@
     ready,
     get context() { return context; },
     call,
-    /** イベント：init / theme / panelShown / panelHidden / storageChanged / drop / revealed / concealed */
+    /** イベント：init / theme / panelShown / panelHidden / storageChanged / drop / revealed / concealed / clipboardChanged */
     on,
     ui: {
       openPanel: () => call("ui.openPanel"),
@@ -137,6 +143,8 @@
       /** SideDock ごと引っ込める */
       dismiss: () => call("ui.dismiss"),
       hint: (text, x) => call("ui.hint", { text, x }),
+      /** カプセルを出して知らせを表示する（ms ミリ秒） */
+      notify: (text, ms) => call("ui.notify", { text, ms }),
       paintRange,
     },
     storage: {
@@ -155,6 +163,30 @@
       list: () => call("browser.list"),
       open: (url, browserId) => call("browser.open", { url, browserId }),
     },
+    media: {
+      /** 再生中のメディア（なければ null）。{ title, artist, album, app, status, position, duration, canSeek, canNext, canPrev, artKey } */
+      get: () => call("media.get"),
+      /** ジャケット画像の data URL（なければ null） */
+      art: () => call("media.art"),
+      /** "toggle" | "play" | "pause" | "next" | "prev" */
+      control: (action) => call("media.control", { action }),
+      seek: (seconds) => call("media.seek", { seconds }),
+    },
+    system: {
+      /** { cpu, cpuName, cores, memUsed, memTotal, diskUsed, diskTotal, battery, charging, uptime } */
+      stats: () => call("system.stats"),
+    },
+    power: {
+      /** "lock" | "sleep" | "restart" | "shutdown" | "signout" */
+      action: (action) => call("power.action", { action }),
+    },
+    clipboard: {
+      list: () => call("clipboard.list"),
+      copy: (id) => call("clipboard.copy", { id }),
+      remove: (id) => call("clipboard.remove", { id }),
+      pin: (id, pinned) => call("clipboard.pin", { id, pinned }),
+      clear: () => call("clipboard.clear"),
+    },
     volume: {
       get: () => call("volume.get"),
       set: (level) => call("volume.set", { level }),
@@ -162,5 +194,10 @@
     },
   });
 
-  post({ type: "ready" });
+  // アドオンのスクリプト（type="module" を含む）がイベントを受け取る準備を終えてから知らせる
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => post({ type: "ready" }));
+  } else {
+    post({ type: "ready" });
+  }
 })();
