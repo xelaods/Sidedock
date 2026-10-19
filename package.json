@@ -1,0 +1,14 @@
+{
+  "name": "sidedock",
+  "private": true,
+  "version": "0.1.0",
+  "description": "画面端に常駐する、アドオンで拡張できるサイドバー",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

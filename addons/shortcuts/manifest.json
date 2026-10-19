@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.shortcuts",
+  "name": "アプリのショートカット",
+  "version": "1.0.0",
+  "description": "よく使うアプリやフォルダをバーに並べます",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "panel": { "entry": "panel.html", "title": "ショートカットの編集", "width": 360 },
+  "permissions": ["app", "dialog", "drop"]
+}

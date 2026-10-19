@@ -1,0 +1,163 @@
+/* 本体の見た目。色の変数（--sd-*）は SDK の sidedock.css と共通 */
+
+:root {
+  --bar-w: 52px;
+  --bar-bg: var(--sd-surface-2);
+  --panel-bg: #f8f9fa;
+  --seam: rgba(26, 28, 31, 0.12);
+}
+:root[data-theme="dark"] {
+  --panel-bg: #26292d;
+  --seam: rgba(0, 0, 0, 0.5);
+}
+
+html, body { height: 100%; overflow: hidden; }
+body { padding: 0; }
+
+#root { display: flex; height: 100%; }
+body[data-edge="left"] #root { flex-direction: row-reverse; }
+
+/* ---------------------------------------------------------------- バー */
+
+#bar {
+  flex: 0 0 var(--bar-w);
+  width: var(--bar-w);
+  display: flex; flex-direction: column;
+  background: var(--bar-bg);
+  /* 画面の内側に向いた辺にだけ境目の線を引く */
+  box-shadow: inset 1px 0 0 var(--seam);
+}
+body[data-edge="left"] #bar { box-shadow: inset -1px 0 0 var(--seam); }
+
+#bar-items {
+  flex: 1;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 6px 0;
+  scrollbar-width: none;
+}
+#bar-items::-webkit-scrollbar { display: none; }
+#bar-foot { padding: 6px 0 8px; }
+
+.bar-frame {
+  display: block; width: 100%; height: 0;
+  border: 0; background: transparent;
+  margin: 2px 0;
+}
+
+.bar-icon {
+  appearance: none; position: relative;
+  display: grid; place-items: center;
+  width: 40px; height: 40px; margin: 2px auto;
+  border: 0; border-radius: var(--sd-radius);
+  background: transparent; color: var(--sd-ink);
+  cursor: default;
+}
+.bar-icon:hover { background: var(--sd-hover); }
+.bar-icon:active { background: var(--sd-press); }
+
+/* アドオンのアイコンは色を本体に合わせるため、形だけ使って塗る */
+.glyph {
+  width: 22px; height: 22px;
+  background: currentColor;
+  -webkit-mask: var(--src) center / contain no-repeat;
+  mask: var(--src) center / contain no-repeat;
+}
+
+/* 開いているパネルの印：パネル側の縁に伸びる縦線 */
+.bar-slot { position: relative; }
+.bar-icon::before, .bar-slot::before {
+  content: "";
+  position: absolute; top: 50%; left: -6px;
+  width: 3px; height: 0; border-radius: 2px;
+  background: var(--sd-accent);
+  transform: translateY(-50%);
+  transition: height 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+body[data-edge="left"] .bar-icon::before { left: auto; right: -6px; }
+.bar-slot::before { left: 0; }
+body[data-edge="left"] .bar-slot::before { left: auto; right: 0; }
+.bar-icon.active { background: var(--sd-hover); color: var(--sd-accent); }
+.bar-icon.active::before, .bar-slot.active::before { height: 18px; }
+
+/* ---------------------------------------------------------------- パネル */
+
+#panel {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+  background: var(--panel-bg);
+}
+#panel[hidden] { display: none; }
+#panel.opening #panel-body > .view:not([hidden]) { animation: slide-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
+body[data-edge="left"] #panel.opening #panel-body > .view:not([hidden]) { animation-name: slide-in-left; }
+@keyframes slide-in { from { transform: translateX(10px); opacity: 0; } }
+@keyframes slide-in-left { from { transform: translateX(-10px); opacity: 0; } }
+
+#panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 10px 4px 16px;
+}
+#panel-title { margin: 0; font-size: 16px; font-weight: 600; }
+
+#panel-body { flex: 1; min-height: 0; position: relative; }
+#panel-body > .view { position: absolute; inset: 0; }
+#panel-body > .view[hidden] { display: none; }
+.panel-frame { width: 100%; height: 100%; border: 0; display: block; background: transparent; }
+
+/* ---------------------------------------------------------------- 設定 */
+
+#settings { overflow-y: auto; padding: 4px 16px 24px; user-select: none; }
+#settings h2 { margin: 18px 0 6px; font-size: 13px; font-weight: 600; }
+#settings h2:first-child { margin-top: 6px; }
+
+.group {
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-line);
+  border-radius: 8px;
+}
+.row {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 48px; padding: 8px 12px;
+}
+.row + .row { border-top: 1px solid var(--sd-line); }
+.row-main { flex: 1; min-width: 0; }
+.row-title { font-size: 13.5px; }
+.row-sub { font-size: 12px; color: var(--sd-ink-2); }
+
+/* 選択肢を並べたボタン（右/左、テーマ） */
+.seg { display: inline-flex; padding: 2px; border-radius: var(--sd-radius); background: var(--sd-surface-2); }
+.seg button {
+  appearance: none; border: 0; background: transparent; color: var(--sd-ink-2);
+  font: inherit; font-size: 12.5px; padding: 4px 10px; border-radius: 4px; cursor: default;
+}
+.seg button[aria-pressed="true"] { background: var(--sd-surface); color: var(--sd-ink); box-shadow: 0 0 0 1px var(--sd-line); }
+
+/* オン/オフ（Windows 11 のトグル風） */
+.switch { position: relative; flex: none; width: 40px; height: 20px; }
+.switch input { position: absolute; inset: 0; margin: 0; opacity: 0; }
+.switch span {
+  position: absolute; inset: 0; border-radius: 10px;
+  border: 1px solid var(--sd-ink-2); background: transparent;
+  transition: background 0.15s, border-color 0.15s;
+  pointer-events: none;
+}
+.switch span::after {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 12px; height: 12px; border-radius: 50%; background: var(--sd-ink-2);
+  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.switch input:checked + span { background: var(--sd-accent); border-color: var(--sd-accent); }
+.switch input:checked + span::after { background: var(--sd-accent-ink); transform: translateX(20px); }
+.switch input:focus-visible + span { outline: 2px solid var(--sd-accent); outline-offset: 2px; }
+
+/* アドオン一覧 */
+.addon .glyph { width: 20px; height: 20px; color: var(--sd-ink-2); flex: none; }
+.addon.off .row-title { color: var(--sd-ink-2); }
+.addon .ver { margin-left: 6px; font-size: 11.5px; color: var(--sd-ink-3); }
+.perms { margin-top: 2px; font-size: 11.5px; color: var(--sd-ink-3); }
+.move { display: flex; flex-direction: column; }
+.move .sd-btn { width: 24px; min-height: 20px; height: 20px; padding: 0; }
+.move .sd-btn svg { width: 10px; height: 10px; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.notice { margin-top: 10px; font-size: 12px; color: var(--sd-danger); white-space: pre-wrap; }
+.foot-note { margin-top: 20px; font-size: 12px; color: var(--sd-ink-3); }

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "本体の UI（main ウィンドウ）だけに許可する。アドオンの iframe は postMessage 経由でしか操作できない",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -1,0 +1,104 @@
+/*
+ * SideDock アドオン用の基本スタイル。本体と同じ配色・文字・部品が使えます。
+ * 色は CSS 変数（--sd-*）で参照してください。ライト/ダークは自動で切り替わります。
+ */
+:root {
+  color-scheme: light;
+  --sd-ink: #1a1c1f;
+  --sd-ink-2: #5e6670;
+  --sd-ink-3: #8a919a;
+  --sd-surface: #ffffff;
+  --sd-surface-2: #eef0f3;
+  --sd-line: rgba(26, 28, 31, 0.1);
+  --sd-hover: rgba(26, 28, 31, 0.06);
+  --sd-press: rgba(26, 28, 31, 0.1);
+  --sd-accent: #0f6cbd;
+  --sd-accent-ink: #ffffff;
+  --sd-danger: #c42b1c;
+  --sd-radius: 6px;
+  --sd-font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --sd-ink: #f2f3f5;
+  --sd-ink-2: #a3a9b1;
+  --sd-ink-3: #767d86;
+  --sd-surface: #2f3237;
+  --sd-surface-2: #1c1e21;
+  --sd-line: rgba(242, 243, 245, 0.1);
+  --sd-hover: rgba(242, 243, 245, 0.07);
+  --sd-press: rgba(242, 243, 245, 0.12);
+  --sd-accent: #6cb8f6;
+  --sd-accent-ink: #0b1a28;
+  --sd-danger: #ff99a4;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: transparent;
+  color: var(--sd-ink);
+  font: 14px/1.5 var(--sd-font);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+:root[data-slot="panel"] body { padding: 4px 16px 16px; }
+:root[data-slot="bar"] body { padding: 0; overflow: hidden; }
+
+:focus-visible { outline: 2px solid var(--sd-accent); outline-offset: 1px; }
+
+/* ボタン */
+.sd-btn {
+  appearance: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 32px; padding: 0 12px;
+  border: 1px solid var(--sd-line); border-radius: var(--sd-radius);
+  background: var(--sd-surface); color: var(--sd-ink);
+  font: inherit; font-size: 13px; cursor: default;
+}
+.sd-btn:hover { background: color-mix(in srgb, var(--sd-surface) 88%, var(--sd-ink)); }
+.sd-btn:active { background: color-mix(in srgb, var(--sd-surface) 80%, var(--sd-ink)); }
+.sd-btn:disabled { opacity: 0.45; }
+.sd-btn.primary { background: var(--sd-accent); border-color: transparent; color: var(--sd-accent-ink); }
+.sd-btn.primary:hover { background: color-mix(in srgb, var(--sd-accent) 90%, var(--sd-surface)); }
+.sd-btn.ghost { background: transparent; border-color: transparent; }
+.sd-btn.ghost:hover { background: var(--sd-hover); }
+.sd-btn.icon { width: 32px; padding: 0; }
+
+/* 入力欄 */
+.sd-input, .sd-select {
+  width: 100%; min-height: 34px; padding: 0 10px;
+  border: 1px solid var(--sd-line); border-bottom-color: color-mix(in srgb, var(--sd-ink) 35%, transparent);
+  border-radius: var(--sd-radius);
+  background: var(--sd-surface); color: var(--sd-ink);
+  font: inherit; user-select: text;
+}
+.sd-input:focus, .sd-select:focus {
+  outline: none;
+  border-bottom: 2px solid var(--sd-accent);
+}
+
+/* 見出しと補足 */
+.sd-label { display: block; margin: 14px 0 6px; font-size: 12px; color: var(--sd-ink-2); }
+.sd-muted { color: var(--sd-ink-2); font-size: 12px; }
+.sd-empty { padding: 24px 8px; text-align: center; color: var(--sd-ink-2); font-size: 13px; }
+
+/* スライダー */
+.sd-range { width: 100%; accent-color: var(--sd-accent); }
+
+/* バーに置くボタン（40×40） */
+.sd-bar-btn {
+  appearance: none; position: relative;
+  display: grid; place-items: center;
+  width: 40px; height: 40px; margin: 2px auto;
+  border: 0; border-radius: var(--sd-radius);
+  background: transparent; color: var(--sd-ink);
+  font: inherit; cursor: default;
+}
+.sd-bar-btn:hover { background: var(--sd-hover); }
+.sd-bar-btn:active { background: var(--sd-press); }
+.sd-bar-btn img { width: 26px; height: 26px; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

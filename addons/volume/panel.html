@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  .main { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  #mute { flex: none; width: 36px; height: 36px; }
+  #range { flex: 1; }
+  #pct { width: 3ch; text-align: right; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 18px; }
+  .presets .sd-btn { padding: 0; font-variant-numeric: tabular-nums; }
+  #error { margin-top: 14px; color: var(--sd-danger); }
+</style>
+</head>
+<body>
+  <div class="main">
+    <button id="mute" class="sd-btn ghost icon" aria-label="ミュート"></button>
+    <input id="range" class="sd-range" type="range" min="0" max="100" step="1" aria-label="音量">
+    <span id="pct" aria-hidden="true"></span>
+  </div>
+  <div class="presets" id="presets"></div>
+  <p id="error" class="sd-muted" hidden></p>
+
+<script type="module">
+  import { speaker } from "./speaker.js";
+
+  const $ = (id) => document.getElementById(id);
+  let current = { level: 0, muted: false };
+  let dragging = false;
+
+  function render() {
+    const pct = Math.round(current.level * 100);
+    if (!dragging) $("range").value = pct;
+    $("pct").textContent = pct;
+    $("mute").innerHTML = speaker(current.level, current.muted, 20);
+    $("mute").title = current.muted ? "ミュートを解除" : "ミュート";
+    $("mute").setAttribute("aria-pressed", String(current.muted));
+  }
+
+  async function refresh() {
+    try {
+      current = await SideDock.volume.get();
+      $("error").hidden = true;
+      render();
+    } catch (e) {
+      $("error").textContent = e.message;
+      $("error").hidden = false;
+    }
+  }
+
+  async function setLevel(pct) {
+    current = { level: pct / 100, muted: pct > 0 ? false : current.muted };
+    render();
+    await SideDock.volume.set(pct / 100).catch(() => {});
+  }
+
+  $("range").addEventListener("input", () => { dragging = true; setLevel(Number($("range").value)); });
+  $("range").addEventListener("change", () => { dragging = false; });
+  $("mute").addEventListener("click", async () => {
+    await SideDock.volume.setMute(!current.muted).catch(() => {});
+    refresh();
+  });
+
+  $("presets").replaceChildren(...[0, 25, 50, 75, 100].map((v) => {
+    const b = document.createElement("button");
+    b.className = "sd-btn";
+    b.textContent = v;
+    b.setAttribute("aria-label", `音量 ${v}%`);
+    b.addEventListener("click", () => setLevel(v));
+    return b;
+  }));
+
+  let timer = null;
+  SideDock.on("panelShown", () => {
+    refresh();
+    $("range").focus();
+    clearInterval(timer);
+    timer = setInterval(() => { if (!dragging) refresh(); }, 1000);
+  });
+  SideDock.on("panelHidden", () => clearInterval(timer));
+
+  await SideDock.ready;
+  refresh();
+</script>
+</body>
+</html>

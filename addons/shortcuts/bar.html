@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  #list { display: flex; flex-direction: column; }
+  .fallback {
+    width: 26px; height: 26px; border-radius: 6px;
+    display: grid; place-items: center;
+    background: var(--sd-surface); box-shadow: inset 0 0 0 1px var(--sd-line);
+    font-size: 13px; font-weight: 600; color: var(--sd-ink-2);
+  }
+  #add { color: var(--sd-ink-3); }
+  #add:hover { color: var(--sd-ink); }
+  .sep { height: 1px; margin: 4px 14px; background: var(--sd-line); }
+</style>
+</head>
+<body>
+  <div id="list"></div>
+  <button id="add" class="sd-bar-btn" title="ショートカットを追加・編集" aria-label="ショートカットを追加・編集">
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  </button>
+  <div class="sep"></div>
+<script type="module">
+  import { load, save, addPaths } from "./common.js";
+
+  let items = [];
+  const list = document.getElementById("list");
+
+  function render() {
+    list.replaceChildren(...items.map((item) => {
+      const b = document.createElement("button");
+      b.className = "sd-bar-btn";
+      b.title = item.name;
+      b.setAttribute("aria-label", `${item.name}を開く`);
+      if (item.icon) {
+        const img = document.createElement("img");
+        img.src = item.icon;
+        img.alt = "";
+        b.append(img);
+      } else {
+        const f = document.createElement("span");
+        f.className = "fallback";
+        f.textContent = item.name.slice(0, 1);
+        b.append(f);
+      }
+      b.addEventListener("click", () => SideDock.app.launch(item.path).catch((e) => { b.title = `${item.name}（${e.message}）`; }));
+      // 右クリックで編集画面
+      b.addEventListener("contextmenu", (e) => { e.preventDefault(); SideDock.ui.openPanel(); });
+      return b;
+    }));
+  }
+
+  document.getElementById("add").addEventListener("click", () => SideDock.ui.openPanel());
+
+  SideDock.on("storageChanged", (data) => { items = data?.items ?? []; render(); });
+  // バーにファイルやショートカットをドロップしたら追加する
+  SideDock.on("drop", async ({ paths }) => {
+    items = await addPaths(items, paths);
+    render();
+    await save(items);
+  });
+
+  await SideDock.ready;
+  items = await load();
+  render();
+</script>
+</body>
+</html>

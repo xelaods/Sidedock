@@ -1,0 +1,10 @@
+{
+  "id": "sidedock.clock",
+  "name": "時計",
+  "version": "1.0.0",
+  "description": "時刻と日付をバーに表示します",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "permissions": []
+}

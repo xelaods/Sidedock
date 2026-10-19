@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  form { margin-top: 4px; }
+  .box { position: relative; }
+  .box svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--sd-ink-3); pointer-events: none; }
+  #q { min-height: 40px; padding-left: 34px; font-size: 15px; }
+
+  .engines { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .engines button {
+    appearance: none; font: inherit; font-size: 12.5px;
+    padding: 3px 10px; border-radius: 14px; cursor: default;
+    border: 1px solid var(--sd-line); background: transparent; color: var(--sd-ink-2);
+  }
+  .engines button:hover { background: var(--sd-hover); color: var(--sd-ink); }
+  .engines button[aria-pressed="true"] { background: var(--sd-accent); border-color: transparent; color: var(--sd-accent-ink); }
+
+  #custom-wrap[hidden] { display: none; }
+  #status { min-height: 18px; margin-top: 12px; }
+  #status.error { color: var(--sd-danger); }
+</style>
+</head>
+<body>
+  <form id="form" autocomplete="off">
+    <div class="box">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+      <input id="q" class="sd-input" type="search" placeholder="検索するか URL を入力" aria-label="検索語または URL" spellcheck="false">
+    </div>
+    <div class="engines" id="engines" role="group" aria-label="検索エンジン"></div>
+
+    <div id="custom-wrap" hidden>
+      <label class="sd-label" for="custom">検索 URL（検索語の位置に %s）</label>
+      <input id="custom" class="sd-input" placeholder="https://example.com/search?q=%s">
+    </div>
+
+    <label class="sd-label" for="browser">開くブラウザ</label>
+    <select id="browser" class="sd-select"></select>
+  </form>
+  <p id="status" class="sd-muted"></p>
+
+<script type="module">
+  const ENGINES = [
+    { id: "google", name: "Google", url: "https://www.google.com/search?q=%s" },
+    { id: "bing", name: "Bing", url: "https://www.bing.com/search?q=%s" },
+    { id: "yahoo", name: "Yahoo! JAPAN", url: "https://search.yahoo.co.jp/search?p=%s" },
+    { id: "duckduckgo", name: "DuckDuckGo", url: "https://duckduckgo.com/?q=%s" },
+    { id: "youtube", name: "YouTube", url: "https://www.youtube.com/results?search_query=%s" },
+    { id: "wikipedia", name: "Wikipedia", url: "https://ja.wikipedia.org/w/index.php?search=%s" },
+    { id: "custom", name: "カスタム", url: "" },
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  let prefs = { engine: "google", browserId: "", custom: "" };
+
+  const save = () => SideDock.storage.set(prefs);
+
+  function renderEngines() {
+    $("engines").replaceChildren(...ENGINES.map((e) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = e.name;
+      b.setAttribute("aria-pressed", String(prefs.engine === e.id));
+      b.addEventListener("click", () => {
+        prefs.engine = e.id;
+        renderEngines();
+        save();
+        $("q").focus();
+      });
+      return b;
+    }));
+    $("custom-wrap").hidden = prefs.engine !== "custom";
+  }
+
+  async function renderBrowsers() {
+    const list = await SideDock.browser.list().catch(() => []);
+    const options = [{ id: "", name: "既定のブラウザ" }, ...list];
+    // 保存していたブラウザがアンインストールされていたら既定に戻す
+    if (!options.some((o) => o.id === prefs.browserId)) prefs.browserId = "";
+    $("browser").replaceChildren(...options.map((o) => new Option(o.name, o.id, false, o.id === prefs.browserId)));
+  }
+
+  /** 入力が URL ならそのまま、そうでなければ検索 URL を作る */
+  function toUrl(text) {
+    if (/^https?:\/\//i.test(text)) return text;
+    if (!/\s/.test(text) && /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(text)) return `https://${text}`;
+    if (/^localhost(:\d+)?(\/\S*)?$/i.test(text)) return `http://${text}`;
+    const engine = ENGINES.find((e) => e.id === prefs.engine) ?? ENGINES[0];
+    const template = engine.id === "custom" ? prefs.custom : engine.url;
+    if (!template.includes("%s") || !/^https?:\/\//i.test(template)) {
+      throw new Error("カスタムの検索 URL は https:// で始め、%s を含めてください");
+    }
+    return template.replace("%s", encodeURIComponent(text));
+  }
+
+  function setStatus(text, error = false) {
+    $("status").textContent = text;
+    $("status").classList.toggle("error", error);
+  }
+
+  $("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = $("q").value.trim();
+    if (!text) return;
+    try {
+      await SideDock.browser.open(toUrl(text), prefs.browserId || undefined);
+      $("q").value = "";
+      setStatus("");
+      SideDock.ui.closePanel();
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  });
+
+  $("q").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") SideDock.ui.closePanel();
+  });
+  $("browser").addEventListener("change", () => { prefs.browserId = $("browser").value; save(); });
+  $("custom").addEventListener("change", () => { prefs.custom = $("custom").value.trim(); save(); });
+
+  // パネルを開くたびに入力欄へカーソルを置く
+  SideDock.on("panelShown", () => {
+    setStatus("");
+    $("q").focus();
+    $("q").select();
+  });
+
+  await SideDock.ready;
+  prefs = { ...prefs, ...((await SideDock.storage.get()) ?? {}) };
+  $("custom").value = prefs.custom;
+  renderEngines();
+  await renderBrowsers();
+  $("q").focus();
+</script>
+</body>
+</html>
