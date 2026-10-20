@@ -70,7 +70,8 @@
   $("view").addEventListener("click", () => SideDock.shell.action("taskview"));
   $("desk").addEventListener("click", () => SideDock.shell.action("desktop"));
   let poller = null;
-  SideDock.on("panelShown", () => { poller?.stop(); poller = SideDock.poll(load, { visible: 1500, hidden: 0 }); });
+  SideDock.on("panelShown", () => { poller?.stop(); poller = SideDock.poll(load, { visible: 15000, hidden: 0 }); });
+  SideDock.on("windowsChanged", () => { if (poller) poller.now(); });
   SideDock.on("panelHidden", () => { poller?.stop(); poller = null; });
 </script>
 </body>

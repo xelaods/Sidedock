@@ -112,7 +112,13 @@
   }
 
   $("start").addEventListener("click", () => SideDock.shell.action("start").catch(() => {}));
-  const poller = SideDock.poll(refresh, { visible: 1000, hidden: 0 });
+  // ウィンドウが開いた・閉じた・切り替わったときに知らせが届く。念のため 15 秒ごとにも確かめる
+  const poller = SideDock.poll(refresh, { visible: 15000, hidden: 0 });
+  let pending = 0;
+  SideDock.on("windowsChanged", () => {
+    if (!SideDock.visible || pending) return;
+    pending = setTimeout(() => { pending = 0; poller.now(); }, 60);
+  });
 </script>
 </body>
 </html>

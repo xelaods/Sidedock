@@ -28,7 +28,7 @@ const HIDE_DELAY = 420; // カーソルが離れてから引っ込むまで
 const HOVER_OPEN = 230; // 項目にとどまってパネルが開くまで
 const HOVER_SWITCH = 80; // パネルが開いている間に隣へ移ったとき
 const PANEL_GAP = 10; // カプセルとパネルの間
-const PANEL_MAX_H = 380;
+const PANEL_MAX_H = 430;
 const SIDE_MARGIN = 16;
 const LEAVE_PAD = 22; // カプセル・パネルの外側にこれだけ余裕を持たせる
 const DEFAULT_PANEL_W = 300;
@@ -42,6 +42,7 @@ const PERMISSION_LABELS = {
   volume: "音量を変える",
   network: "インターネットに接続する",
   windows: "開いているウィンドウの一覧・切り替え、スタートメニューを開く",
+  settings: "Wi-Fi・Bluetooth・明るさ・ダークモードを変える",
   media: "再生中の音楽を見る・操作する",
   system: "CPU・メモリ・バッテリーの状態を見る",
   clipboard: "コピーした文字の履歴を見る",
@@ -490,7 +491,28 @@ function contentHeightOf(id) {
   return state.heights.get(id) ?? 0;
 }
 
+/** 閉じてしばらく使っていないパネルの iframe は捨てて、メモリを空ける（次に開くと作り直す） */
+const PANEL_UNLOAD_MS = 90_000;
+const unloadTimers = new Map();
+
+function scheduleUnload(id) {
+  if (id === "settings") return;
+  clearTimeout(unloadTimers.get(id));
+  unloadTimers.set(id, setTimeout(() => {
+    unloadTimers.delete(id);
+    if (state.active === id) return;
+    const v = state.views.get(id);
+    if (!v) return;
+    state.frames.delete(v.iframe.contentWindow);
+    v.view.remove();
+    state.views.delete(id);
+    state.heights.delete(id);
+  }, PANEL_UNLOAD_MS));
+}
+
 function ensureView(id) {
+  clearTimeout(unloadTimers.get(id));
+  unloadTimers.delete(id);
   if (id === "settings" || state.views.has(id)) return;
   const addon = state.addons.get(id);
   const view = el("div", { className: "view" });
@@ -559,7 +581,10 @@ async function openPanel(id, { focus = false } = {}) {
   $("#panel-title").textContent = id === "settings" ? "設定" : state.addons.get(id).panel.title || state.addons.get(id).name;
   syncActive();
 
-  if (prev && prev !== "settings") notifyPanel(prev, "panelHidden");
+  if (prev && prev !== "settings") {
+    notifyPanel(prev, "panelHidden");
+    scheduleUnload(prev);
+  }
   if (id !== "settings") notifyPanel(id, "panelShown");
   if (focus) invoke("take_focus").catch(() => {});
 }
@@ -579,6 +604,7 @@ function closePanel() {
   for (const v of document.querySelectorAll(".view")) v.classList.remove("active");
   syncActive();
   if (prev !== "settings") notifyPanel(prev, "panelHidden");
+  scheduleUnload(prev);
   syncHitRects();
 }
 
@@ -694,6 +720,22 @@ const API = {
   "windows.activate": { perm: "windows", run: (f, p) => invoke("windows_activate", { id: Number(p.id) }) },
   "windows.focus": { perm: "windows", run: (f, p) => invoke("windows_focus", { id: Number(p.id) }) },
   "windows.close": { perm: "windows", run: (f, p) => invoke("windows_close", { id: Number(p.id) }) },
+  "net.status": { perm: "settings", run: () => invoke("net_status") },
+  "wifi.list": { perm: "settings", run: () => invoke("wifi_list") },
+  "wifi.connect": { perm: "settings", run: (f, p) => invoke("wifi_connect", { ssid: String(p.ssid) }) },
+  "radios.get": { perm: "settings", run: () => invoke("radios_get") },
+  "radios.set": { perm: "settings", run: (f, p) => invoke("radio_set", { kind: String(p.kind), on: !!p.on }) },
+  "brightness.get": { perm: "settings", run: () => invoke("brightness_get") },
+  "brightness.set": { perm: "settings", run: (f, p) => invoke("brightness_set", { value: clamp(Math.round(Number(p.value) || 0), 0, 100) }) },
+  "theme.getDark": { perm: "settings", run: () => invoke("dark_get") },
+  "theme.setDark": { perm: "settings", run: (f, p) => invoke("dark_set", { dark: !!p.dark }) },
+  "battery.get": {
+    run: async () => {
+      const [level, charging] = await invoke("battery_get");
+      return level == null ? null : { level, charging };
+    },
+  },
+
   "tray.list": { perm: "windows", run: () => invoke("tray_list") },
   "tray.running": { perm: "windows", run: () => invoke("tray_running") },
   "tray.click": {
@@ -933,7 +975,7 @@ function renderSettings() {
         // 置き換えるときは、下に常に表示して、タスクバーの代わりになるアドオンも有効にする
         const patch = v ? { hideTaskbar: true, edge: "bottom", show: "always" } : { hideTaskbar: false, show: "hover" };
         if (v) {
-          const want = ["sidedock.taskbar", "sidedock.tray", "sidedock.clock"];
+          const want = ["sidedock.taskbar", "sidedock.tray", "sidedock.quick", "sidedock.clock"];
           patch.addons = state.config.addons.map((a) => (want.includes(a.id) ? { ...a, enabled: true } : a));
         }
         await saveConfig(patch);
@@ -955,7 +997,7 @@ function renderSettings() {
   root.replaceChildren(
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.5.0" })),
+      el("span", { className: "s-ver", textContent: "0.6.0" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
     el("div", { className: "s-sec", textContent: "アドオン" }),
@@ -1020,6 +1062,11 @@ async function start() {
   if (enabledAddons().some((a) => a.permissions.includes("clipboard"))) invoke("clipboard_watch").catch(() => {});
   await listen("clipboard-changed", () => broadcast("clipboardChanged", {}, { permission: "clipboard" }));
   await listen("tray-changed", () => broadcast("trayChanged", {}, { permission: "windows" }));
+  // 変化があったときだけアドオンに知らせる（各アドオンが何度も取り直さなくてよいように）
+  await listen("windows-changed", () => broadcast("windowsChanged", {}, { permission: "windows" }));
+  await listen("volume-changed", ({ payload }) => broadcast("volumeChanged", payload ?? null, { permission: "volume" }));
+  await listen("media-changed", () => broadcast("mediaChanged", {}, { permission: "media" }));
+  await listen("network-changed", () => broadcast("networkChanged", {}, { permission: "settings" }));
 
   await listen("cursor", ({ payload }) => onCursor(payload));
   await listen("suspend", ({ payload }) => onSuspend(!!payload));

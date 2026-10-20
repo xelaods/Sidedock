@@ -32,6 +32,7 @@ mod win {
         time::{SystemTime, UNIX_EPOCH},
     };
     use windows::{
+        Foundation::TypedEventHandler,
         Media::Control::{
             GlobalSystemMediaTransportControlsSession as Session,
             GlobalSystemMediaTransportControlsSessionManager as Manager,
@@ -68,7 +69,60 @@ mod win {
         }
         let mgr = Manager::RequestAsync()?.join()?;
         *m = Some(mgr.clone());
+        drop(m);
+        watch(&mgr);
         Ok(mgr)
+    }
+
+    /// 曲や再生状態が変わったら "media-changed" を送る（ポーリングの代わり）
+    fn changed() {
+        if let Some(app) = crate::APP.get() {
+            use tauri::Emitter;
+            let _ = app.emit_to("main", "media-changed", ());
+        }
+    }
+
+    /// 監視しているセッション（再生しているアプリ）
+    static WATCHED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    fn watch_sessions(mgr: &Manager) {
+        let Ok(list) = mgr.GetSessions() else { return };
+        let mut watched = WATCHED.lock().unwrap();
+        for s in list {
+            let id = s
+                .SourceAppUserModelId()
+                .map(|h| h.to_string())
+                .unwrap_or_default();
+            if watched.contains(&id) {
+                continue;
+            }
+            let _ = s.MediaPropertiesChanged(&TypedEventHandler::new(|_, _| {
+                changed();
+                Ok(())
+            }));
+            let _ = s.PlaybackInfoChanged(&TypedEventHandler::new(|_, _| {
+                changed();
+                Ok(())
+            }));
+            watched.push(id);
+        }
+    }
+
+    fn watch(mgr: &Manager) {
+        let _ = mgr.CurrentSessionChanged(&TypedEventHandler::new(|_, _| {
+            changed();
+            Ok(())
+        }));
+        let _ = mgr.SessionsChanged(&TypedEventHandler::new(
+            |m: windows::core::Ref<Manager>, _| {
+                if let Some(m) = m.as_ref() {
+                    watch_sessions(m);
+                }
+                changed();
+                Ok(())
+            },
+        ));
+        watch_sessions(mgr);
     }
 
     fn session() -> Result<Option<Session>, String> {

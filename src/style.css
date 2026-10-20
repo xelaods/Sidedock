@@ -134,16 +134,20 @@ body.is-suspended #stage { visibility: hidden; }
   opacity: 0;
   transform: translateY(-18px) scale(0.84, 0.6);
   filter: blur(8px);
+  /* 引っ込み終わったら描画そのものをやめる（中のアドオンの描画も止まり、軽くなる） */
+  visibility: hidden;
   transition:
     opacity 0.18s var(--ease-in) 0.04s,
     transform 0.26s var(--ease-in),
-    filter 0.2s var(--ease-in);
+    filter 0.2s var(--ease-in),
+    visibility 0s linear 0.3s;
 }
 /* 出てくるとき：上端の印から膨らむように、バネで止まる */
 .is-shown #capsule {
   opacity: 1;
   transform: none;
   filter: none;
+  visibility: visible;
   transition:
     opacity 0.26s var(--ease),
     transform 0.66s var(--spring),
@@ -303,16 +307,19 @@ body.is-suspended #stage { visibility: hidden; }
   opacity: 0;
   transform: translateY(-10px) scale(0.96);
   filter: blur(6px);
+  visibility: hidden;
   transition:
     opacity 0.16s var(--ease-in),
     transform 0.2s var(--ease-in),
-    filter 0.16s var(--ease-in);
+    filter 0.16s var(--ease-in),
+    visibility 0s linear 0.22s;
 }
 #panel.open {
   pointer-events: auto;
   opacity: 1;
   transform: none;
   filter: none;
+  visibility: visible;
   transition:
     opacity 0.26s var(--ease),
     transform 0.56s var(--spring),
@@ -361,13 +368,15 @@ body[data-edge="bottom"].is-shown.settled .icon-btn.hover { transform: translate
   transform: translateY(6px);
   filter: blur(4px);
   pointer-events: none;
-  transition: opacity 0.14s, transform 0.2s, filter 0.14s;
+  visibility: hidden;
+  transition: opacity 0.14s, transform 0.2s, filter 0.14s, visibility 0s linear 0.2s;
 }
 .view.active {
   opacity: 1;
   transform: none;
   filter: none;
   pointer-events: auto;
+  visibility: visible;
   transition:
     opacity 0.32s var(--ease) 0.07s,
     transform 0.5s var(--spring) 0.07s,

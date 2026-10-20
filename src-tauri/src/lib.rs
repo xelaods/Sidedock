@@ -4,6 +4,7 @@ mod config;
 mod log;
 mod media;
 mod overlay;
+mod quick;
 mod sysmon;
 mod system;
 mod taskbar;
@@ -24,6 +25,9 @@ use tauri::{
 };
 use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_dialog::DialogExt;
+
+/// どこからでもイベントを送れるように（音量・曲・ウィンドウの変化など）
+pub static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 
 pub struct AppState {
     config: Mutex<Config>,
@@ -76,6 +80,7 @@ fn reload(app: &AppHandle) -> InitData {
             "sidedock.notes",
             "sidedock.timer",
             "sidedock.volume",
+            "sidedock.quick",
             "sidedock.tray",
         ];
         ids.sort_by_key(|id| preferred.iter().position(|p| p == id).unwrap_or(usize::MAX));
@@ -252,6 +257,7 @@ fn browser_open(browser_id: Option<String>, url: String) -> Result<(), String> {
 
 #[tauri::command(async)]
 fn volume_get() -> Result<system::VolumeInfo, String> {
+    system::volume_watch();
     system::volume_get()
 }
 
@@ -349,6 +355,56 @@ fn windows_focus(id: i64) {
 #[tauri::command(async)]
 fn windows_close(id: i64) {
     taskbar::close(id);
+}
+
+#[tauri::command(async)]
+fn net_status() -> quick::NetStatus {
+    quick::status()
+}
+
+#[tauri::command(async)]
+fn wifi_list() -> Result<Vec<quick::WifiNetwork>, String> {
+    quick::wifi_list()
+}
+
+#[tauri::command(async)]
+fn wifi_connect(ssid: String) -> Result<(), String> {
+    quick::wifi_connect(&ssid)
+}
+
+#[tauri::command(async)]
+fn radios_get() -> Vec<quick::RadioInfo> {
+    quick::radios()
+}
+
+#[tauri::command(async)]
+fn radio_set(kind: String, on: bool) -> Result<(), String> {
+    quick::radio_set(&kind, on)
+}
+
+#[tauri::command(async)]
+fn brightness_get() -> Option<u32> {
+    quick::brightness_get()
+}
+
+#[tauri::command(async)]
+fn brightness_set(value: u32) -> Result<(), String> {
+    quick::brightness_set(value)
+}
+
+#[tauri::command(async)]
+fn dark_get() -> bool {
+    quick::dark_get()
+}
+
+#[tauri::command(async)]
+fn dark_set(dark: bool) -> Result<(), String> {
+    quick::dark_set(dark)
+}
+
+#[tauri::command]
+fn battery_get() -> (Option<u8>, bool) {
+    sysmon::battery()
 }
 
 #[tauri::command]
@@ -467,6 +523,7 @@ pub fn run() {
         })
         .setup(|app| {
             let handle = app.handle().clone();
+            let _ = APP.set(handle.clone());
             log::reset(&handle);
             log::write(
                 &handle,
@@ -537,6 +594,16 @@ pub fn run() {
             tray_list,
             tray_running,
             tray_click,
+            net_status,
+            wifi_list,
+            wifi_connect,
+            radios_get,
+            radio_set,
+            brightness_get,
+            brightness_set,
+            dark_get,
+            dark_set,
+            battery_get,
             set_low_memory,
         ])
         .build(tauri::generate_context!())

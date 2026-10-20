@@ -1,0 +1,24 @@
+{
+  "id": "sidedock.quick",
+  "name": "クイック設定",
+  "version": "1.0.0",
+  "description": "Wi-Fi・音量・バッテリーの状態。押すと Wi-Fi / Bluetooth の切り替え、明るさ、ダークモードなど",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": {
+    "entry": "bar.html"
+  },
+  "panel": {
+    "entry": "panel.html",
+    "title": "クイック設定",
+    "width": 320,
+    "trigger": "manual"
+  },
+  "permissions": [
+    "settings",
+    "volume",
+    "app",
+    "windows"
+  ],
+  "defaultEnabled": false
+}

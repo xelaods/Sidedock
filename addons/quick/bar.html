@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 0 2px; }
+  #btn { width: auto; padding: 0 10px; gap: 8px; display: inline-flex; align-items: center; border-radius: 16px; }
+  #btn:hover { transform: none; }
+  #btn svg { display: block; }
+  #bat { display: inline-flex; align-items: center; gap: 3px; font: 600 10.5px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; color: var(--sd-ink-2); }
+  #bat:empty { display: none; }
+</style>
+</head>
+<body>
+  <button id="btn" class="sd-bar-btn" aria-label="クイック設定" data-hint="クイック設定">
+    <span id="net"></span><span id="vol"></span><span id="bat"></span>
+  </button>
+<script type="module">
+  import { netIcon, volIcon, batIcon } from "./icons.js";
+  const $ = (id) => document.getElementById(id);
+  let net = null, vol = null, bat = null;
+
+  function render() {
+    $("net").innerHTML = netIcon(net);
+    $("vol").innerHTML = volIcon(vol);
+    $("bat").innerHTML = bat ? `${batIcon(bat)}${bat.level}%` : "";
+    const parts = [];
+    if (net) parts.push(net.kind === "wifi" ? `Wi-Fi：${net.ssid || "接続中"}${net.internet ? "" : "（インターネットなし）"}` : net.kind === "ethernet" ? "有線 LAN" : "ネットワークなし");
+    if (vol) parts.push(vol.muted ? "ミュート" : `音量 ${Math.round(vol.level * 100)}%`);
+    if (bat) parts.push(`バッテリー ${bat.level}%${bat.charging ? "（充電中）" : ""}`);
+    $("btn").dataset.hint = parts.join("・") || "クイック設定";
+  }
+
+  async function refresh() {
+    [net, vol, bat] = await Promise.all([
+      SideDock.net.status().catch(() => null),
+      SideDock.volume.get().catch(() => null),
+      SideDock.battery.get().catch(() => null),
+    ]);
+    render();
+  }
+
+  $("btn").addEventListener("click", () => SideDock.ui.togglePanel());
+  // ホイールで音量
+  $("btn").addEventListener("wheel", async (e) => {
+    e.preventDefault();
+    if (!vol) return;
+    const level = Math.min(1, Math.max(0, Math.round((vol.level + (e.deltaY < 0 ? 0.02 : -0.02)) * 100) / 100));
+    vol = { level, muted: level > 0 ? false : vol.muted };
+    render();
+    SideDock.ui.hint(`音量 ${Math.round(level * 100)}%`, $("btn").offsetWidth / 2);
+    await SideDock.volume.set(level).catch(() => {});
+  }, { passive: false });
+
+  // 状態が変わったら知らせが届く。バッテリーだけは 1 分ごとに見る
+  SideDock.on("networkChanged", async () => { net = await SideDock.net.status().catch(() => net); render(); });
+  SideDock.on("volumeChanged", (v) => { if (v && typeof v.level === "number") { vol = v; render(); } });
+  SideDock.poll(refresh, { visible: 60000, hidden: 0 });
+</script>
+</body>
+</html>

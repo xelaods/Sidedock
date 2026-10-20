@@ -3269,7 +3269,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "sidedock"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arboard",
  "base64 0.22.1",
@@ -3285,6 +3285,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "webview2-com",
  "windows",
+ "windows-core",
  "winreg",
 ]
 

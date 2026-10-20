@@ -41,13 +41,17 @@ mod win {
                 BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ,
             },
             Media::Audio::{
-                eConsole, eRender, Endpoints::IAudioEndpointVolume, IMMDeviceEnumerator,
-                MMDeviceEnumerator,
+                eConsole, eRender,
+                Endpoints::{
+                    IAudioEndpointVolume, IAudioEndpointVolumeCallback,
+                    IAudioEndpointVolumeCallback_Impl,
+                },
+                IMMDeviceEnumerator, MMDeviceEnumerator, AUDIO_VOLUME_NOTIFICATION_DATA,
             },
             Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES,
             System::Com::{
                 CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL,
-                COINIT_APARTMENTTHREADED,
+                COINIT_APARTMENTTHREADED, COINIT_MULTITHREADED,
             },
             UI::{
                 Controls::{IImageList, ILD_TRANSPARENT},
@@ -122,6 +126,68 @@ mod win {
 
     pub fn volume_set_mute(muted: bool) -> Result<(), String> {
         with_volume(|v| unsafe { v.SetMute(muted, std::ptr::null()) })
+    }
+
+    /// 音量が変わったら知らせてもらう（ポーリングの代わり）
+    #[windows::core::implement(IAudioEndpointVolumeCallback)]
+    struct VolumeWatcher;
+
+    impl IAudioEndpointVolumeCallback_Impl for VolumeWatcher_Impl {
+        fn OnNotify(&self, data: *mut AUDIO_VOLUME_NOTIFICATION_DATA) -> windows::core::Result<()> {
+            if let (Some(app), Some(d)) = (crate::APP.get(), unsafe { data.as_ref() }) {
+                use tauri::Emitter;
+                let _ = app.emit_to(
+                    "main",
+                    "volume-changed",
+                    VolumeInfo {
+                        level: d.fMasterVolume,
+                        muted: d.bMuted.as_bool(),
+                    },
+                );
+            }
+            Ok(())
+        }
+    }
+
+    static WATCHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+    /// 音量の監視を始める（何度呼んでも 1 回だけ）。出力先の機器が変わったら作り直す
+    pub fn volume_watch() {
+        use std::sync::atomic::Ordering;
+        if WATCHING.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        std::thread::spawn(|| unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            let mut current: Option<(String, IAudioEndpointVolume, IAudioEndpointVolumeCallback)> =
+                None;
+            loop {
+                let next = (|| -> windows::core::Result<(String, IAudioEndpointVolume)> {
+                    let e: IMMDeviceEnumerator =
+                        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+                    let d = e.GetDefaultAudioEndpoint(eRender, eConsole)?;
+                    let id = d.GetId()?.to_string().unwrap_or_default();
+                    Ok((id, d.Activate(CLSCTX_ALL, None)?))
+                })();
+                if let Ok((id, vol)) = next {
+                    if current.as_ref().map(|c| &c.0) != Some(&id) {
+                        if let Some((_, old, cb)) = current.take() {
+                            let _ = old.UnregisterControlChangeNotify(&cb);
+                        }
+                        let cb: IAudioEndpointVolumeCallback = VolumeWatcher.into();
+                        if vol.RegisterControlChangeNotify(&cb).is_ok() {
+                            current = Some((id, vol, cb));
+                            if let Some(app) = crate::APP.get() {
+                                use tauri::Emitter;
+                                let _ = app.emit_to("main", "volume-changed", ());
+                            }
+                        }
+                    }
+                }
+                // 機器の切り替え（スピーカー ⇔ イヤホン）は 3 秒ごとに確かめる
+                std::thread::sleep(std::time::Duration::from_secs(3));
+            }
+        });
     }
 
     // ---------------------------------------------------------------- 起動
@@ -395,6 +461,7 @@ mod other {
         VOL.lock().unwrap().1 = muted;
         Ok(())
     }
+    pub fn volume_watch() {}
     pub fn launch(path: &str, _args: Option<&str>) -> Result<(), String> {
         let opener = if cfg!(target_os = "macos") {
             "open"

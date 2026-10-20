@@ -1,7 +1,7 @@
 {
   "name": "sidedock",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "画面上部に隠れていて、近づくと出てくるランチャー",
   "scripts": {
     "dev": "tauri dev",

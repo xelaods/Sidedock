@@ -1,12 +1,20 @@
 {
   "id": "sidedock.clock",
   "name": "時計",
-  "version": "2.0.0",
-  "description": "時刻と日付をバーに表示します",
+  "version": "2.1.0",
+  "description": "日付と時刻。押すとカレンダー（日本の祝日つき）が開きます",
   "author": "SideDock",
   "icon": "icon.svg",
   "bar": {
     "entry": "bar.html"
   },
-  "permissions": []
+  "permissions": [
+    "network"
+  ],
+  "panel": {
+    "entry": "panel.html",
+    "title": "カレンダー",
+    "width": 280,
+    "trigger": "manual"
+  }
 }

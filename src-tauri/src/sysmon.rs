@@ -24,6 +24,36 @@ pub struct Stats {
 }
 
 static SYS: Mutex<Option<System>> = Mutex::new(None);
+/// ディスクの使用量は重いので 1 分に 1 回だけ調べる
+static DISK: Mutex<Option<(std::time::Instant, u64, u64)>> = Mutex::new(None);
+
+fn disk_usage() -> (u64, u64) {
+    let mut cache = DISK.lock().unwrap();
+    if let Some((at, used, total)) = *cache {
+        if at.elapsed().as_secs() < 60 {
+            return (used, total);
+        }
+    }
+    let disks = Disks::new_with_refreshed_list();
+    let system_drive = std::env::var("SystemDrive")
+        .unwrap_or_else(|_| "C:".into())
+        .to_uppercase();
+    let disk = disks
+        .list()
+        .iter()
+        .find(|d| {
+            d.mount_point()
+                .to_string_lossy()
+                .to_uppercase()
+                .starts_with(&system_drive)
+        })
+        .or_else(|| disks.list().first());
+    let v = disk
+        .map(|d| (d.total_space() - d.available_space(), d.total_space()))
+        .unwrap_or((0, 0));
+    *cache = Some((std::time::Instant::now(), v.0, v.1));
+    v
+}
 
 pub fn stats() -> Stats {
     let mut guard = SYS.lock().unwrap();
@@ -44,18 +74,7 @@ pub fn stats() -> Stats {
         .map(|c| c.brand().trim().to_string())
         .unwrap_or_default();
 
-    let disks = Disks::new_with_refreshed_list();
-    let system_drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
-    let disk = disks
-        .list()
-        .iter()
-        .find(|d| {
-            d.mount_point()
-                .to_string_lossy()
-                .to_uppercase()
-                .starts_with(&system_drive.to_uppercase())
-        })
-        .or_else(|| disks.list().first());
+    let (disk_used, disk_total) = disk_usage();
 
     let (battery, charging) = battery();
     Stats {
@@ -64,10 +83,8 @@ pub fn stats() -> Stats {
         cores: cpus.len(),
         mem_used: sys.used_memory(),
         mem_total: sys.total_memory(),
-        disk_used: disk
-            .map(|d| d.total_space() - d.available_space())
-            .unwrap_or(0),
-        disk_total: disk.map(|d| d.total_space()).unwrap_or(0),
+        disk_used,
+        disk_total,
         battery,
         charging,
         uptime: System::uptime(),
@@ -75,7 +92,7 @@ pub fn stats() -> Stats {
 }
 
 #[cfg(windows)]
-fn battery() -> (Option<u8>, bool) {
+pub fn battery() -> (Option<u8>, bool) {
     use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
     let mut s = SYSTEM_POWER_STATUS::default();
     if unsafe { GetSystemPowerStatus(&mut s) }.is_err() {
@@ -89,7 +106,7 @@ fn battery() -> (Option<u8>, bool) {
 }
 
 #[cfg(not(windows))]
-fn battery() -> (Option<u8>, bool) {
+pub fn battery() -> (Option<u8>, bool) {
     (None, false)
 }
 

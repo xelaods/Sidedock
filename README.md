@@ -8,8 +8,9 @@
 | アドオン | できること |
 | --- | --- |
 | タスクバー | スタートボタンと、開いているアプリのアイコン。クリックで切り替え・最小化、中クリックで新しく開く、右クリックでウィンドウ一覧（閉じるボタン付き） |
-| 通知とトレイ | 他のアプリのトレイアイコン（タスクバーの代わりにしている間）・クイック設定（Wi-Fi・音量）・通知センター |
-| ★ 時計 | 日付と時刻 |
+| 通知とトレイ | 他のアプリのトレイアイコン（タスクバーの代わりにしている間）と通知センター |
+| ★ 時計 | 日付と時刻。押すとカレンダー（日本の祝日つき）が開く |
+| クイック設定 | Wi-Fi・音量・バッテリーの今の状態をアイコンで表示。押すと Wi-Fi / Bluetooth のオン・オフ、Wi-Fi の一覧とつなぎ替え、ダークモード、音量、画面の明るさ |
 | ★ 再生中の音楽 | Spotify・Apple Music・YouTube などの曲名とジャケット、再生/一時停止・曲送り・再生位置の変更。カプセルの上でホイールを回すと曲送り |
 | ★ アプリのショートカット | よく使うアプリやフォルダを並べる（ドラッグ＆ドロップでも追加） |
 | ★ 検索 | 近づけると検索欄が開き、そのまま打ち込める。ブラウザと検索エンジンを選べる |
@@ -20,7 +21,6 @@
 | システムモニター | CPU・メモリ・ディスク・バッテリー |
 | 電卓 | 式をそのまま打ち込める（キーボードでも） |
 | 天気 | 今の気温と 6 日間の予報（Open-Meteo） |
-| カレンダー | 月のカレンダーと日本の祝日 |
 | 電源 | ロック・スリープ・再起動・シャットダウン・サインアウト（危ないものは 2 回押し） |
 | クイックツール | スクショ・設定・タスク管理・ごみ箱・Wi-Fi などをすぐ開く |
 
@@ -67,17 +67,13 @@ npm run build    # インストーラーを作る（src-tauri\target\release\bun
 
 ### 軽さのための工夫
 
-- カーソルが画面上部から離れている間は、カーソルを調べる回数を 60 回/秒から約 11 回/秒に落とす
-- カプセルが隠れている間は、アドオンのアニメーションを止め、音量・再生中の曲・CPU などの取得も止める（出てきた瞬間に取り直す）
+- WebView2 のサイト分離を切り、アドオンの iframe を本体と同じ描画プロセスにまとめる。裏での通信・更新確認も止める
+- カプセルやパネルが隠れたら描画そのものをやめる（中のアドオンの描画も止まる）。アニメーションも止める
+- 閉じたパネルは 90 秒使わなければ破棄して、メモリを空ける（次に開くと作り直す）
+- 音量・再生中の曲・ウィンドウの一覧・ネットワークは、Windows から「変わった」と知らせてもらう方式にし、定期的な取り直しをほぼなくす
+- カーソルが画面の端から離れている間は、カーソルを調べる回数を約 11 回/秒に落とす
+- 実行ファイルの場所やディスクの使用量など、重い問い合わせは覚えておく
 - 隠れてしばらくすると、WebView2 に使っていないメモリを手放してもらう
-- 終了はタスクトレイのメニューか、設定の一番下から
-
-### しくみ
-
-- 画面上部の全幅を覆う透明なウィンドウで、ふだんはクリックを下のアプリへ素通しする。カプセルとパネルの上にカーソルがある間だけクリックを受け取る
-- Rust 側でカーソルの位置を約 60 回/秒で調べ、画面上部の近くにあるときだけ UI に知らせる
-- 前面のウィンドウがディスプレイ全体を覆っていたら（D3D の全画面・プレゼンテーションモードも）ウィンドウごと隠す
-- 検索欄などでフォーカスをもらったときは、引っ込むときに直前のアプリへフォーカスを返す
 
 ## アドオンの作り方
 
@@ -130,6 +126,7 @@ my-addon/
 | `system` | `SideDock.system.stats()` で CPU・メモリ・ディスク・バッテリー |
 | `clipboard` | `SideDock.clipboard.list()` / `copy(id)` / `pin(id, true)` / `remove(id)` / `clear()`、`clipboardChanged` イベント |
 | `power` | `SideDock.power.action("lock" \| "sleep" \| "restart" \| "shutdown" \| "signout")` |
+| `settings` | `SideDock.net.status()`、`SideDock.wifi.list()` / `connect(ssid)`、`SideDock.radios.get()` / `set("wifi" \| "bluetooth", true)`、`SideDock.brightness.get()` / `set(0〜100)`、`SideDock.theme.getDark()` / `setDark(true)`、`networkChanged` イベント |
 | `windows` | `SideDock.windows.list()` / `icon(id, exe)` / `activate(id)` / `focus(id)` / `close(id)`、`SideDock.tray.list()` / `click(key, "left" \| "right" \| "double")`、`SideDock.shell.action("start" \| "quick" \| "notifications" \| "desktop" \| "taskview")`、`trayChanged` イベント |
 
 権限がなくても、`SideDock.storage.get()` / `set(data)` でアドオン専用の保存領域（JSON）が使えます。
@@ -163,6 +160,8 @@ my-addon/
 - 要素に `data-hint="説明"` を付けると、カーソルを乗せたときカプセルの下に説明が出る
 - UI の操作：`ui.openPanel()` `ui.closePanel()` `ui.togglePanel()` `ui.focus()`（キーボード入力を受け取る）`ui.dismiss()`（引っ込める）`ui.notify(文字, ミリ秒)`（カプセルを出して知らせる）
 - manifest.json に `"defaultEnabled": false` と書くと、最初はオフの状態で一覧に出る
+- 権限なしで使えるもの：`SideDock.battery.get()`（`{ level, charging }` か null）
+- 変化の知らせ：`volumeChanged`（音量）・`mediaChanged`（曲）・`windowsChanged`（ウィンドウ）は、それぞれの権限があるアドオンに届く。定期的に取り直すより軽い
 - `SideDock.poll(関数, { visible: 1000, hidden: 0 })` で、カプセルが出ている間だけ定期的に呼べる（隠れている間は止まり、出てきた瞬間に 1 回呼ばれる）。`SideDock.visible` で今出ているか分かる
 - イベント：`init` `theme` `panelShown` `panelHidden` `storageChanged` `drop` `revealed` `concealed`
 - アドオンはサンドボックス化された iframe で動き、本体とは `postMessage` 経由でしかやり取りできない。`alert()` などのダイアログは使えない
@@ -179,6 +178,7 @@ src-tauri/src/
   clipboard.rs      クリップボードの履歴
   taskbar.rs        ウィンドウの一覧・切り替え、スタートメニュー、タスクバーを隠す
   tray.rs           トレイアイコンの受け取り・クリックの転送、画面の領域の確保
+  quick.rs          ネットワーク・Wi-Fi・Bluetooth・明るさ・ダークモード
   log.rs            診断ログ
   system.rs         音量、アプリ起動、アイコン取得、ブラウザ一覧
   addons.rs         アドオンの読み込み、addon:// の配信、保存領域

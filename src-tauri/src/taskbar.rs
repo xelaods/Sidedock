@@ -24,7 +24,13 @@ pub use win::*;
 #[cfg(windows)]
 mod win {
     use super::WindowInfo;
-    use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+    use std::{
+        collections::HashMap,
+        sync::{
+            atomic::{AtomicBool, AtomicI32, Ordering},
+            Mutex,
+        },
+    };
     use windows::{
         core::{BOOL, PWSTR},
         Win32::{
@@ -35,18 +41,24 @@ mod win {
                 PROCESS_QUERY_LIMITED_INFORMATION,
             },
             UI::{
+                Accessibility::{SetWinEventHook, HWINEVENTHOOK},
                 Input::KeyboardAndMouse::{
                     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
                     VIRTUAL_KEY, VK_LWIN, VK_MENU,
                 },
                 Shell::{SHAppBarMessage, ABM_GETSTATE, ABM_SETSTATE, ABS_AUTOHIDE, APPBARDATA},
                 WindowsAndMessaging::{
-                    EnumChildWindows, EnumWindows, GetClassLongPtrW, GetClassNameW,
-                    GetForegroundWindow, GetWindow, GetWindowLongW, GetWindowTextLengthW,
-                    GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
-                    PostMessageW, SendMessageTimeoutW, SetForegroundWindow, ShowWindow, GCLP_HICON,
-                    GWL_EXSTYLE, GW_OWNER, HICON, ICON_BIG, SMTO_ABORTIFHUNG, SW_HIDE, SW_MINIMIZE,
-                    SW_RESTORE, SW_SHOWNOACTIVATE, WM_CLOSE, WM_GETICON, WS_EX_APPWINDOW,
+                    DispatchMessageW, EnumChildWindows, EnumWindows, GetClassLongPtrW,
+                    GetClassNameW, GetForegroundWindow, GetWindow, GetWindowLongW,
+                    GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
+                    IsWindow, IsWindowVisible, MsgWaitForMultipleObjects, PeekMessageW,
+                    PostMessageW, SendMessageTimeoutW, SetForegroundWindow, ShowWindow,
+                    TranslateMessage, EVENT_OBJECT_CLOAKED, EVENT_OBJECT_CREATE, EVENT_OBJECT_HIDE,
+                    EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_UNCLOAKED, EVENT_SYSTEM_FOREGROUND,
+                    EVENT_SYSTEM_MINIMIZEEND, EVENT_SYSTEM_MINIMIZESTART, GCLP_HICON, GWL_EXSTYLE,
+                    GW_OWNER, HICON, ICON_BIG, MSG, PM_REMOVE, QS_ALLINPUT, SMTO_ABORTIFHUNG,
+                    SW_HIDE, SW_MINIMIZE, SW_RESTORE, SW_SHOWNOACTIVATE, WINEVENT_OUTOFCONTEXT,
+                    WINEVENT_SKIPOWNPROCESS, WM_CLOSE, WM_GETICON, WS_EX_APPWINDOW,
                     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
                 },
             },
@@ -156,7 +168,88 @@ mod win {
     }
 
     /// 開いているウィンドウ（タスクバーに並ぶもの）。`last` は SideDock を触る前の前面
+    /// プロセスの実行ファイルは毎回調べると重いので覚えておく
+    static EXE_CACHE: Mutex<Option<HashMap<u32, String>>> = Mutex::new(None);
+
+    fn exe_cached(pid: u32) -> String {
+        let mut cache = EXE_CACHE.lock().unwrap();
+        let map = cache.get_or_insert_with(HashMap::new);
+        if let Some(e) = map.get(&pid) {
+            return e.clone();
+        }
+        if map.len() > 400 {
+            map.clear();
+        }
+        let e = exe_of_pid(pid);
+        map.insert(pid, e.clone());
+        e
+    }
+
+    // ------------------------------------------------------------ ウィンドウの変化を見張る
+
+    static WATCHING: AtomicBool = AtomicBool::new(false);
+    static DIRTY: AtomicBool = AtomicBool::new(false);
+
+    unsafe extern "system" fn on_event(
+        _hook: HWINEVENTHOOK,
+        _event: u32,
+        hwnd: HWND,
+        id_object: i32,
+        id_child: i32,
+        _thread: u32,
+        _time: u32,
+    ) {
+        // ウィンドウそのもの（中の部品ではない）の変化だけ
+        if id_object == 0 && id_child == 0 && !hwnd.is_invalid() {
+            DIRTY.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// ウィンドウが開いた・閉じた・切り替わった・題名が変わったら "windows-changed" を送る
+    /// （1 秒ごとに一覧を取り直す代わり）。何度呼んでも 1 回だけ
+    pub fn watch() {
+        if WATCHING.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        std::thread::spawn(|| unsafe {
+            let ranges = [
+                (EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND),
+                (EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND),
+                (EVENT_OBJECT_CREATE, EVENT_OBJECT_HIDE),
+                (EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_NAMECHANGE),
+                (EVENT_OBJECT_CLOAKED, EVENT_OBJECT_UNCLOAKED),
+            ];
+            for (a, b) in ranges {
+                SetWinEventHook(
+                    a,
+                    b,
+                    None,
+                    Some(on_event),
+                    0,
+                    0,
+                    WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+                );
+            }
+            // フックはこのスレッドのメッセージで呼ばれる。150ms ごとにまとめて知らせる
+            let mut msg = MSG::default();
+            loop {
+                while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                    let _ = TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                }
+                if DIRTY.swap(false, Ordering::Relaxed) {
+                    if let Some(app) = crate::APP.get() {
+                        use tauri::Emitter;
+                        let _ = app.emit_to("main", "windows-changed", ());
+                    }
+                }
+                let _ = MsgWaitForMultipleObjects(None, false, 150, QS_ALLINPUT);
+            }
+        });
+    }
+
     pub fn list(last: isize) -> Vec<WindowInfo> {
+        watch();
         unsafe extern "system" fn cb(h: HWND, l: LPARAM) -> BOOL {
             let v = &mut *(l.0 as *mut Vec<HWND>);
             v.push(h);
@@ -191,7 +284,7 @@ mod win {
             out.push(WindowInfo {
                 id: h.0 as isize as i64,
                 title,
-                exe: exe_of_pid(pid),
+                exe: exe_cached(pid),
                 minimized: unsafe { IsIconic(h).as_bool() },
                 active: h.0 as isize == current,
             });

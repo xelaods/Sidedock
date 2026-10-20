@@ -6,7 +6,9 @@
 <script src="http://addon.localhost/_sdk/sidedock.js"></script>
 <style>
   /* 権限のいらない、いちばん小さなアドオンの例 */
-  body { padding: 0 8px 0 10px; gap: 8px; }
+  body { padding: 0 8px 0 10px; gap: 8px; border-radius: 16px; cursor: default; transition: background 0.2s; }
+  body:hover { background: var(--sd-hover); }
+  body:active { background: var(--sd-press); }
   #date { font-size: 11.5px; color: var(--sd-ink-2); letter-spacing: 0.02em; }
   #time {
     font: 600 14px/1 var(--sd-font-display);
@@ -33,6 +35,8 @@
     setTimeout(tick, 60000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 50);
   }
   tick();
+  // 押すとカレンダーを開く（Windows のタスクバーの時計と同じ）
+  document.body.addEventListener("click", () => SideDock.ui.togglePanel());
 </script>
 </body>
 </html>

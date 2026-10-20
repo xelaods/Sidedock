@@ -95,7 +95,7 @@
     $("toggle").innerHTML = playing ? ICONS.pause : ICONS.play;
     $("toggle").dataset.hint = playing ? "一時停止" : "再生";
     $("now").dataset.hint = `${info.title}${info.artist ? " — " + info.artist : ""}（${appName(info.app)}）`;
-  });
+  }, 15000);
 
   $("toggle").addEventListener("click", async (e) => {
     e.stopPropagation();

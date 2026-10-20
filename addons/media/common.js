@@ -46,5 +46,8 @@ export function watch(onChange, interval = 1000) {
       onChange(null, null);
     }
   }
-  return SideDock.poll(tick, { visible: interval, hidden: 0 });
+  // 曲や再生状態が変わると知らせが届くので、定期的な取り直しはゆっくりでよい
+  const p = SideDock.poll(tick, { visible: interval, hidden: 0 });
+  const off = SideDock.on("mediaChanged", () => { if (SideDock.visible) p.now(); });
+  return { now: p.now, stop() { p.stop(); off(); } };
 }

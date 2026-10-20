@@ -102,13 +102,12 @@
     return b;
   }));
 
-  let timer = null;
-  SideDock.on("panelShown", () => {
-    refresh();
-    clearInterval(timer);
-    timer = setInterval(() => { if (!dragging && !sending) refresh(); }, 1000);
+  SideDock.on("panelShown", () => refresh());
+  // 音量が変わると知らせが届く（1 秒ごとに取り直す代わり）
+  SideDock.on("volumeChanged", (v) => {
+    if (dragging || sending) return;
+    if (v && typeof v.level === "number") { current = v; render(); } else refresh();
   });
-  SideDock.on("panelHidden", () => clearInterval(timer));
 
   await SideDock.ready;
   refresh();

@@ -81,8 +81,12 @@
     refresh();
   });
 
-  // 他のアプリやキーボードで変えた音量にも追いつく（隠れている間は調べない）
-  SideDock.poll(() => (sending ? null : refresh()), { visible: 1500, hidden: 0 });
+  // 音量が変わると知らせが届く（キーボードや他のアプリで変えても）。念のため 20 秒ごとにも確かめる
+  SideDock.on("volumeChanged", (v) => {
+    if (sending) return;
+    if (v && typeof v.level === "number") { current = v; render(); } else refresh();
+  });
+  SideDock.poll(() => (sending ? null : refresh()), { visible: 20000, hidden: 0 });
 </script>
 </body>
 </html>

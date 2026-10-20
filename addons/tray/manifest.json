@@ -1,12 +1,21 @@
 {
   "id": "sidedock.tray",
   "name": "通知とトレイ",
-  "version": "2.0.0",
-  "description": "他のアプリのトレイアイコン・クイック設定・通知センター（タスクバーの代わりにしている間はアイコンも並ぶ）",
+  "version": "2.1.0",
+  "description": "他のアプリのトレイアイコンと通知センター（タスクバーの代わりにしている間はアイコンが並ぶ）",
   "author": "SideDock",
   "icon": "icon.svg",
-  "bar": { "entry": "bar.html" },
-  "panel": { "entry": "panel.html", "title": "トレイ", "width": 252, "trigger": "manual" },
-  "permissions": ["windows"],
+  "bar": {
+    "entry": "bar.html"
+  },
+  "panel": {
+    "entry": "panel.html",
+    "title": "トレイ",
+    "width": 252,
+    "trigger": "manual"
+  },
+  "permissions": [
+    "windows"
+  ],
   "defaultEnabled": false
 }

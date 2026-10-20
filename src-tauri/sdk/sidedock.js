@@ -171,7 +171,7 @@
     get visible() { return visible; },
     poll,
     call,
-    /** イベント：init / theme / panelShown / panelHidden / storageChanged / drop / revealed / concealed / clipboardChanged / trayChanged */
+    /** イベント：init / theme / panelShown / panelHidden / storageChanged / drop / revealed / concealed / clipboardChanged / trayChanged / windowsChanged / volumeChanged / mediaChanged / networkChanged */
     on,
     ui: {
       openPanel: () => call("ui.openPanel"),
@@ -234,6 +234,35 @@
       activate: (id) => call("windows.activate", { id }),
       focus: (id) => call("windows.focus", { id }),
       close: (id) => call("windows.close", { id }),
+    },
+    /** クイック設定（権限 settings） */
+    net: {
+      /** { kind: "wifi" | "ethernet" | "none", ssid, bars: 0〜5, internet } */
+      status: () => call("net.status"),
+    },
+    wifi: {
+      /** [{ ssid, signal: 0〜100, secured, connected, saved }] */
+      list: () => call("wifi.list"),
+      /** 保存済みのネットワークにつなぐ（保存されていなければ "unsaved" のエラー） */
+      connect: (ssid) => call("wifi.connect", { ssid }),
+    },
+    radios: {
+      /** [{ kind: "wifi" | "bluetooth", on }] */
+      get: () => call("radios.get"),
+      set: (kind, on) => call("radios.set", { kind, on }),
+    },
+    brightness: {
+      /** 0〜100（変えられない画面なら null） */
+      get: () => call("brightness.get"),
+      set: (value) => call("brightness.set", { value }),
+    },
+    theme: {
+      getDark: () => call("theme.getDark"),
+      setDark: (dark) => call("theme.setDark", { dark }),
+    },
+    /** バッテリー（権限なしで使える）。{ level, charging } かバッテリーがなければ null */
+    battery: {
+      get: () => call("battery.get"),
     },
     tray: {
       /** 他のアプリのトレイアイコン：[{ key, tip, icon, exe }]（タスクバーの代わりにしている間だけ） */

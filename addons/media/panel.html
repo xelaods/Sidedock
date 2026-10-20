@@ -136,7 +136,8 @@
   requestAnimationFrame(frame);
 
   let w = null;
-  SideDock.on("panelShown", () => { w?.stop(); w = watch(render, 1000); });
+  // 開いている間は再生位置のずれを直すため 5 秒ごとにも取り直す
+  SideDock.on("panelShown", () => { w?.stop(); w = watch(render, 5000); });
   SideDock.on("panelHidden", () => { w?.stop(); w = null; });
 
   const act = async (a) => {
