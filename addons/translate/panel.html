@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 12px; }
+  .langs { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .langs .sd-select { min-height: 30px; font-size: 12px; }
+  .langs button { flex: none; width: 28px; height: 28px; border-radius: 14px; border: 0; background: transparent; color: var(--sd-ink-2); display: grid; place-items: center; cursor: default; transition: transform 0.4s var(--sd-ease); }
+  .langs button:hover { background: var(--sd-hover); transform: rotate(180deg); }
+  .langs svg { width: 14px; height: 14px; }
+  textarea { display: block; width: 100%; resize: none; padding: 9px 11px; border: 0; border-radius: 11px; font: 13px/1.5 var(--sd-font); user-select: text; }
+  #src { height: 74px; background: var(--sd-surface); color: var(--sd-ink); box-shadow: inset 0 0 0 1px var(--sd-line); }
+  #src:focus { outline: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sd-accent) 60%, transparent); }
+  .out { position: relative; margin-top: 8px; }
+  #dst { height: 84px; background: var(--sd-surface-2); color: var(--sd-ink); box-shadow: inset 0 0 0 1px var(--sd-line); }
+  .out.loading #dst { color: var(--sd-ink-3); }
+  #copy { position: absolute; right: 6px; bottom: 6px; min-height: 24px; font-size: 10.5px; padding: 0 8px; }
+  .note { margin: 6px 2px 0; font-size: 10px; color: var(--sd-ink-3); }
+  #err { color: var(--sd-danger); }
+</style>
+</head>
+<body>
+  <div class="langs">
+    <select id="from" class="sd-select" aria-label="元の言語"></select>
+    <button id="swap" aria-label="入れ替え"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h11l-3-3M14 11H3l3 3"/></svg></button>
+    <select id="to" class="sd-select" aria-label="翻訳先の言語"></select>
+  </div>
+  <textarea id="src" placeholder="翻訳したい文を入力（Ctrl+Enter で翻訳）" spellcheck="false" aria-label="元の文"></textarea>
+  <div class="out" id="outbox">
+    <textarea id="dst" readonly aria-label="翻訳結果"></textarea>
+    <button id="copy" class="sd-btn">コピー</button>
+  </div>
+  <p class="note"><span id="err"></span> <span>MyMemory（無料・1 日の文字数に上限あり）を使っています</span></p>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const LANGS = [["auto", "自動"], ["ja", "日本語"], ["en", "英語"], ["ko", "韓国語"], ["zh-CN", "中国語（簡体）"], ["zh-TW", "中国語（繁体）"], ["fr", "フランス語"], ["de", "ドイツ語"], ["es", "スペイン語"], ["it", "イタリア語"], ["th", "タイ語"], ["vi", "ベトナム語"]];
+  $("from").replaceChildren(...LANGS.map(([c, n]) => new Option(n, c)));
+  $("to").replaceChildren(...LANGS.filter(([c]) => c !== "auto").map(([c, n]) => new Option(n, c)));
+  let prefs = { from: "auto", to: "en" };
+
+  // 文字の種類からおおよその言語を当てる
+  function detect(t) {
+    if (/[぀-ヿ]/.test(t)) return "ja";
+    if (/[가-힯]/.test(t)) return "ko";
+    if (/[一-鿿]/.test(t)) return "zh-CN";
+    if (/[฀-๿]/.test(t)) return "th";
+    return "en";
+  }
+
+  let seq = 0;
+  async function translate() {
+    const text = $("src").value.trim();
+    $("err").textContent = "";
+    if (!text) { $("dst").value = ""; return; }
+    let from = prefs.from === "auto" ? detect(text) : prefs.from;
+    let to = prefs.to;
+    // 自動のとき、日本語なら英語へ、それ以外なら日本語へ
+    if (prefs.from === "auto" && from === to) to = from === "ja" ? "en" : "ja";
+    const my = ++seq;
+    $("outbox").classList.add("loading");
+    try {
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=${from}|${to}`);
+      const j = await res.json();
+      if (my !== seq) return;
+      if (j.responseStatus !== 200 && j.responseStatus !== "200") throw new Error(j.responseDetails || "翻訳できませんでした");
+      const tmp = document.createElement("textarea");
+      tmp.innerHTML = j.responseData.translatedText;
+      $("dst").value = tmp.value;
+    } catch (e) {
+      if (my === seq) $("err").textContent = e.message || "翻訳できませんでした";
+    }
+    if (my === seq) $("outbox").classList.remove("loading");
+  }
+
+  let timer = 0;
+  $("src").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(translate, 700); });
+  $("src").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.ctrlKey) { clearTimeout(timer); translate(); } });
+  $("from").addEventListener("change", () => { prefs.from = $("from").value; SideDock.storage.set(prefs); translate(); });
+  $("to").addEventListener("change", () => { prefs.to = $("to").value; SideDock.storage.set(prefs); translate(); });
+  $("swap").addEventListener("click", () => {
+    const f = prefs.from === "auto" ? detect($("src").value || "あ") : prefs.from;
+    prefs = { from: prefs.to, to: f };
+    $("from").value = prefs.from; $("to").value = prefs.to;
+    if ($("dst").value) { $("src").value = $("dst").value; }
+    SideDock.storage.set(prefs); translate();
+  });
+  $("copy").addEventListener("click", async () => {
+    await SideDock.clipboard.write($("dst").value).catch(() => {});
+    $("copy").textContent = "コピーしました";
+    setTimeout(() => ($("copy").textContent = "コピー"), 1500);
+  });
+  SideDock.on("panelShown", async () => { await SideDock.ui.focus().catch(() => {}); $("src").focus(); $("src").select(); });
+  await SideDock.ready;
+  prefs = { ...prefs, ...((await SideDock.storage.get()) ?? {}) };
+  $("from").value = prefs.from; $("to").value = prefs.to;
+</script>
+</body>
+</html>

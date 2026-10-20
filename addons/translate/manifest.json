@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.translate",
+  "name": "翻訳",
+  "version": "1.0.0",
+  "description": "日本語・英語・韓国語などをすぐに翻訳します（MyMemory を利用）",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "翻訳", "width": 320 },
+  "permissions": ["network"],
+  "defaultEnabled": false
+}

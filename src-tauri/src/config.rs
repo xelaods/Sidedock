@@ -26,6 +26,10 @@ pub struct Config {
     pub show: String,
     /// Windows のタスクバーを隠して、SideDock を代わりに使う
     pub hide_taskbar: bool,
+    /// 見た目："glass" | "minimal" | "neon" | "soft" | "classic"
+    pub skin: String,
+    /// アクセントカラー："blue" | "violet" | "pink" | "orange" | "green" | "mono"
+    pub accent: String,
     /// アドオンの並び順と有効/無効
     pub addons: Vec<AddonEntry>,
 }
@@ -39,6 +43,8 @@ impl Default for Config {
             theme: "dark".into(),
             show: "hover".into(),
             hide_taskbar: false,
+            skin: "glass".into(),
+            accent: "blue".into(),
             addons: Vec::new(),
         }
     }
@@ -62,6 +68,12 @@ impl Config {
         }
         if !matches!(self.show.as_str(), "hover" | "always") {
             self.show = d.show;
+        }
+        if !matches!(self.skin.as_str(), "glass" | "minimal" | "neon" | "soft" | "classic") {
+            self.skin = d.skin;
+        }
+        if !matches!(self.accent.as_str(), "blue" | "violet" | "pink" | "orange" | "green" | "mono") {
+            self.accent = d.accent;
         }
         let mut seen = std::collections::HashSet::new();
         self.addons.retain(|a| seen.insert(a.id.clone()));

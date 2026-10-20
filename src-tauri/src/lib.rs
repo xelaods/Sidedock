@@ -1,6 +1,7 @@
 mod addons;
 mod clipboard;
 mod config;
+mod files;
 mod log;
 mod media;
 mod overlay;
@@ -327,6 +328,11 @@ fn clipboard_pin(app: AppHandle, id: String, pinned: bool) {
     clipboard::pin(&app, &id, pinned);
 }
 
+#[tauri::command(async)]
+fn clipboard_write(text: String) -> Result<(), String> {
+    clipboard::write(&text)
+}
+
 #[tauri::command]
 fn clipboard_clear(app: AppHandle) {
     clipboard::clear(&app);
@@ -400,6 +406,16 @@ fn dark_get() -> bool {
 #[tauri::command(async)]
 fn dark_set(dark: bool) -> Result<(), String> {
     quick::dark_set(dark)
+}
+
+#[tauri::command(async)]
+fn recent_files(limit: Option<usize>) -> Vec<files::RecentFile> {
+    files::recent(limit.unwrap_or(30).min(100))
+}
+
+#[tauri::command(async)]
+fn net_speed() -> (u64, u64) {
+    sysmon::net_speed()
 }
 
 #[tauri::command]
@@ -585,6 +601,7 @@ pub fn run() {
             clipboard_remove,
             clipboard_pin,
             clipboard_clear,
+            clipboard_write,
             windows_list,
             windows_icon,
             windows_activate,
@@ -604,6 +621,8 @@ pub fn run() {
             dark_get,
             dark_set,
             battery_get,
+            recent_files,
+            net_speed,
             set_low_memory,
         ])
         .build(tauri::generate_context!())

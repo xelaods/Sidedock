@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 0 8px; }
+  .box { display: grid; grid-template-columns: auto auto; column-gap: 4px; align-items: center; font: 600 10px/1.25 var(--sd-font-display); font-variant-numeric: tabular-nums; }
+  .box i { font-style: normal; color: var(--sd-ink-3); }
+  .box span { min-width: 54px; text-align: right; transition: color 0.4s; }
+  .box span.busy { color: var(--sd-accent); }
+</style>
+</head>
+<body>
+  <div class="box" id="box" data-hint="ネット速度">
+    <i>↓</i><span id="rx">-</span>
+    <i>↑</i><span id="tx">-</span>
+  </div>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const fmt = (b) => b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB/s` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB/s` : b >= 1e3 ? `${Math.round(b / 1e3)} KB/s` : `${b} B/s`;
+  async function tick() {
+    const s = await SideDock.system.netSpeed().catch(() => null);
+    if (!s) return;
+    $("rx").textContent = fmt(s.rx);
+    $("tx").textContent = fmt(s.tx);
+    $("rx").classList.toggle("busy", s.rx > 1e6);
+    $("tx").classList.toggle("busy", s.tx > 1e6);
+    $("box").dataset.hint = `ダウンロード ${fmt(s.rx)}・アップロード ${fmt(s.tx)}`;
+  }
+  SideDock.poll(tick, { visible: 2000, hidden: 0 });
+</script>
+</body>
+</html>

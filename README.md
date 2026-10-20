@@ -23,6 +23,29 @@
 | 天気 | 今の気温と 6 日間の予報（Open-Meteo） |
 | 電源 | ロック・スリープ・再起動・シャットダウン・サインアウト（危ないものは 2 回押し） |
 | クイックツール | スクショ・設定・タスク管理・ごみ箱・Wi-Fi などをすぐ開く |
+| Todo | やることリスト。残りの数がカプセルに出る |
+| カウントダウン | 旅行・試験・締め切りまでの残り日数をカプセルに表示 |
+| 世界時計 | 世界の都市の今の時刻と、日本との時差 |
+| 通貨換算 | 円・ウォン・ドルなどを今のレートで換算（欧州中央銀行のレート） |
+| 単位換算 | 長さ・重さ・温度・面積・容量・速さ・データ量 |
+| 翻訳 | 日本語・英語・韓国語などをすぐに翻訳（MyMemory） |
+| QR コード | コピーした URL や文字を QR コードにして、スマホで開く |
+| 最近のファイル | 最近開いたファイルやフォルダをすぐ開く |
+| ネット速度 | 今のダウンロード・アップロードの速さをカプセルに表示 |
+
+### デザイン
+
+設定の「デザイン」で見た目を切り替えられます。アドオンの中のボタンやスライダーも同じデザインに揃います。
+
+| デザイン | 見た目 |
+| --- | --- |
+| グラス | すりガラスの質感と光の演出（既定） |
+| ミニマル | 光や質感のない、平らで静かな見た目。動きも控えめ |
+| ネオン | 真っ暗な面の縁がアクセントカラーで光る（いつもダーク） |
+| ソフト | 大きな丸みと、アクセントカラーをほんのり混ぜた柔らかい面 |
+| クラシック | 昔の Windows のような、灰色の立体的な縁と四角い角 |
+
+アクセントカラーは 青・紫・ピンク・オレンジ・緑・モノクロ から選べます。
 
 技術：Tauri 2（Rust）＋ HTML/CSS/JS。メモリが軽く、UI とアドオンは Web 技術で書けます。
 
@@ -49,7 +72,7 @@ npm run build    # インストーラーを作る（src-tauri\target\release\bun
 - 画面の上端（カプセルの位置）にカーソルを近づけると出てくる。離れると引っ込む
   - 隠れている間は上端に小さな印があり、カーソルが近づくほど明るく伸びる
 - 検索や音量などは、アイコンにカーソルをとどめるとパネルが開く（クリックでもすぐ開く）
-- 歯車から **設定**：出てくる場所（画面の上・下＝タスクバーの位置）、横の位置（左・中央・右）、表示のしかた（近づけたとき・常に表示）、反応する範囲（狭い・普通・広い）、テーマ、Windows の起動時に開く、Windows のタスクバーを隠す、アドオンの並べ替えと有効/無効
+- 歯車から **設定**：出てくる場所（画面の上・下＝タスクバーの位置）、横の位置（左・中央・右）、表示のしかた（近づけたとき・常に表示）、反応する範囲（狭い・普通・広い）、テーマ、デザインとアクセントカラー、Windows の起動時に開く、Windows のタスクバーを隠す、アドオンの並べ替えと有効/無効
 - 下に出すときは、パネルが上に向かって開きます
 - Esc で引っ込める
 
@@ -123,10 +146,11 @@ my-addon/
 | `volume` | `SideDock.volume.get()` / `set(0〜1)` / `setMute(true/false)` |
 | `network` | インターネットへの接続（ないと外部のサーバーへの通信はすべて止められる） |
 | `media` | `SideDock.media.get()` / `art()` / `control("toggle" \| "next" \| "prev" …)` / `seek(秒)` |
-| `system` | `SideDock.system.stats()` で CPU・メモリ・ディスク・バッテリー |
-| `clipboard` | `SideDock.clipboard.list()` / `copy(id)` / `pin(id, true)` / `remove(id)` / `clear()`、`clipboardChanged` イベント |
+| `system` | `SideDock.system.stats()` で CPU・メモリ・ディスク・バッテリー、`system.netSpeed()` で通信の速さ（`{ rx, tx }` バイト/秒） |
+| `clipboard` | `SideDock.clipboard.write(文字)`（これだけは権限なしでも使える）、`SideDock.clipboard.list()` / `copy(id)` / `pin(id, true)` / `remove(id)` / `clear()`、`clipboardChanged` イベント |
 | `power` | `SideDock.power.action("lock" \| "sleep" \| "restart" \| "shutdown" \| "signout")` |
 | `settings` | `SideDock.net.status()`、`SideDock.wifi.list()` / `connect(ssid)`、`SideDock.radios.get()` / `set("wifi" \| "bluetooth", true)`、`SideDock.brightness.get()` / `set(0〜100)`、`SideDock.theme.getDark()` / `setDark(true)`、`networkChanged` イベント |
+| `files` | `SideDock.files.recent(件数)` で最近開いたファイル・フォルダ（`{ name, path, at, isDir }`） |
 | `windows` | `SideDock.windows.list()` / `icon(id, exe)` / `activate(id)` / `focus(id)` / `close(id)`、`SideDock.tray.list()` / `click(key, "left" \| "right" \| "double")`、`SideDock.shell.action("start" \| "quick" \| "notifications" \| "desktop" \| "taskview")`、`trayChanged` イベント |
 
 権限がなくても、`SideDock.storage.get()` / `set(data)` でアドオン専用の保存領域（JSON）が使えます。
@@ -154,7 +178,7 @@ my-addon/
 </html>
 ```
 
-- 色は `var(--sd-ink)`、`var(--sd-accent)` などの CSS 変数を使うと、ライト/ダークに自動で合う
+- 色は `var(--sd-ink)`、`var(--sd-accent)` などの CSS 変数を使うと、ライト/ダーク・デザイン・アクセントカラーに自動で合う（角の丸みは `var(--sd-radius)` `var(--sd-btn-radius)`。`:root[data-skin="neon"]` などで、デザインごとに見た目を変えることもできる）
 - 部品のクラス：`sd-btn`（`primary` `ghost` `icon`）、`sd-input`、`sd-select`、`sd-range`、`sd-bar-btn`（カプセル用の丸いボタン 32×32）
 - ウィジェットの幅・パネルの高さは中身に合わせて自動で伸び縮みする
 - 要素に `data-hint="説明"` を付けると、カーソルを乗せたときカプセルの下に説明が出る

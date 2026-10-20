@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 12px; }
+  .row { display: grid; grid-template-columns: 1fr 96px; gap: 6px; }
+  .amount { font: 600 18px/1 var(--sd-font-display) !important; min-height: 40px !important; font-variant-numeric: tabular-nums; }
+  .sd-select { min-height: 40px; font-size: 12.5px; }
+  .swap { display: flex; justify-content: center; margin: 4px 0; }
+  .swap button { width: 28px; height: 28px; border-radius: 14px; border: 0; background: var(--sd-surface); box-shadow: inset 0 0 0 1px var(--sd-line); color: var(--sd-ink-2); display: grid; place-items: center; cursor: default; transition: transform 0.4s var(--sd-ease), color 0.2s; }
+  .swap button:hover { color: var(--sd-ink); transform: rotate(180deg); }
+  .swap svg { width: 14px; height: 14px; }
+  #out { padding: 0 12px; border-radius: var(--sd-radius); background: var(--sd-surface-2); box-shadow: inset 0 0 0 1px var(--sd-line); display: flex; align-items: center; justify-content: space-between; cursor: default; }
+  #out b { font: 700 18px/40px var(--sd-font-display); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #out small { font-size: 10px; color: var(--sd-ink-3); }
+  #rate { margin: 8px 2px 0; font-size: 11px; color: var(--sd-ink-2); }
+  .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 10px; }
+  .quick div { padding: 6px 8px; border-radius: 8px; background: var(--sd-surface-2); font-size: 10.5px; color: var(--sd-ink-2); font-variant-numeric: tabular-nums; }
+  .quick b { display: block; color: var(--sd-ink); font-size: 12px; }
+  #upd { margin: 8px 2px 0; font-size: 10px; color: var(--sd-ink-3); }
+  #err { color: var(--sd-danger); font-size: 11px; margin: 6px 2px 0; }
+  #err:empty { display: none; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <input id="amt" class="sd-input amount" inputmode="decimal" value="10000" aria-label="金額">
+    <select id="from" class="sd-select" aria-label="元の通貨"></select>
+  </div>
+  <div class="swap"><button id="swap" aria-label="入れ替え"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2v12M2 11l3 3 3-3M11 14V2M8 5l3-3 3 3"/></svg></button></div>
+  <div class="row">
+    <div id="out" title="クリックでコピー"><b id="res">-</b><small>コピー</small></div>
+    <select id="to" class="sd-select" aria-label="換算先の通貨"></select>
+  </div>
+  <p id="rate"></p>
+  <div class="quick" id="quick"></div>
+  <p id="upd"></p>
+  <p id="err"></p>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const CUR = [
+    ["JPY", "円"], ["KRW", "ウォン"], ["USD", "ドル"], ["EUR", "ユーロ"], ["CNY", "元"], ["TWD", "台湾ドル"],
+    ["GBP", "ポンド"], ["AUD", "豪ドル"], ["THB", "バーツ"], ["HKD", "香港ドル"], ["SGD", "シンガポールドル"], ["CAD", "カナダドル"],
+  ];
+  const name = (c) => (CUR.find((x) => x[0] === c) ?? [c, c])[1];
+  let state = { from: "JPY", to: "KRW", rates: null, at: 0 };
+
+  for (const sel of [$("from"), $("to")]) sel.replaceChildren(...CUR.map(([c, n]) => new Option(`${c} ${n}`, c)));
+
+  async function loadRates(force = false) {
+    // 1 日 1 回だけ取り直す（ECB のレートは平日 1 回の更新）
+    if (!force && state.rates && Date.now() - state.at < 6 * 3600_000) return;
+    try {
+      const res = await fetch(`https://api.frankfurter.app/latest?from=EUR&to=${CUR.map((c) => c[0]).filter((c) => c !== "EUR").join(",")}`);
+      if (!res.ok) throw new Error();
+      const j = await res.json();
+      state.rates = { EUR: 1, ...j.rates };
+      state.at = Date.now();
+      state.date = j.date;
+      SideDock.storage.set(state);
+      $("err").textContent = "";
+    } catch {
+      $("err").textContent = state.rates ? "最新のレートを取れなかったので、前回のレートで計算しています" : "レートを取得できませんでした";
+    }
+  }
+  const conv = (v, a, b) => (v / state.rates[a]) * state.rates[b];
+  const fmt = (v, c) => v.toLocaleString("ja-JP", { maximumFractionDigits: ["JPY", "KRW", "TWD"].includes(c) ? 0 : 2 });
+
+  function render() {
+    $("from").value = state.from; $("to").value = state.to;
+    if (!state.rates) return;
+    const v = parseFloat($("amt").value.replace(/[^\d.]/g, "")) || 0;
+    $("res").textContent = fmt(conv(v, state.from, state.to), state.to);
+    $("rate").textContent = `1 ${state.from} = ${conv(1, state.from, state.to).toLocaleString("ja-JP", { maximumSignificantDigits: 5 })} ${state.to}`;
+    const amounts = state.from === "JPY" ? [1000, 5000, 10000] : state.from === "KRW" ? [10000, 50000, 100000] : [1, 10, 100];
+    $("quick").replaceChildren(...amounts.map((a) => {
+      const d = document.createElement("div");
+      d.innerHTML = `<span></span><b></b>`;
+      d.firstChild.textContent = `${a.toLocaleString()} ${name(state.from)}`;
+      d.lastChild.textContent = `${fmt(conv(a, state.from, state.to), state.to)} ${name(state.to)}`;
+      return d;
+    }));
+    $("upd").textContent = state.date ? `${state.date} のレート（欧州中央銀行・frankfurter.app）` : "";
+  }
+
+  $("amt").addEventListener("input", render);
+  $("from").addEventListener("change", () => { state.from = $("from").value; SideDock.storage.set(state); render(); });
+  $("to").addEventListener("change", () => { state.to = $("to").value; SideDock.storage.set(state); render(); });
+  $("swap").addEventListener("click", () => { [state.from, state.to] = [state.to, state.from]; SideDock.storage.set(state); render(); });
+  $("out").addEventListener("click", async () => {
+    await SideDock.clipboard.write($("res").textContent.replace(/,/g, "")).catch(() => {});
+    $("out").querySelector("small").textContent = "コピーしました";
+    setTimeout(() => ($("out").querySelector("small").textContent = "コピー"), 1500);
+  });
+  SideDock.on("panelShown", async () => {
+    await SideDock.ui.focus().catch(() => {});
+    $("amt").focus(); $("amt").select();
+    await loadRates(); render();
+  });
+  await SideDock.ready;
+  state = { ...state, ...((await SideDock.storage.get()) ?? {}) };
+  render();
+</script>
+</body>
+</html>

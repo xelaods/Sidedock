@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 10px; }
+  form { display: flex; gap: 6px; margin-bottom: 8px; }
+  #text { min-height: 32px; font-size: 12.5px; }
+  form .sd-btn { flex: none; min-height: 32px; }
+  #list { display: flex; flex-direction: column; gap: 1px; }
+  .it { display: flex; align-items: center; gap: 9px; padding: 6px 4px 6px 6px; border-radius: 9px; transition: background 0.18s, opacity 0.3s; }
+  .it:hover { background: var(--sd-hover); }
+  .chk {
+    appearance: none; flex: none; width: 18px; height: 18px; margin: 0; border-radius: 6px; cursor: default;
+    box-shadow: inset 0 0 0 1.5px var(--sd-ink-3); display: grid; place-items: center;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .chk:checked { background: var(--sd-accent); box-shadow: none; }
+  .chk:checked::after { content: ""; width: 9px; height: 5px; margin-top: -2px; border: solid var(--sd-accent-ink); border-width: 0 0 2px 2px; transform: rotate(-45deg); animation: tick 0.3s var(--sd-ease); }
+  @keyframes tick { from { transform: rotate(-45deg) scale(0); } }
+  .t { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; word-break: break-word; }
+  .it.done .t { color: var(--sd-ink-3); text-decoration: line-through; }
+  .del { appearance: none; border: 0; background: transparent; color: var(--sd-ink-3); width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; cursor: default; opacity: 0; transition: opacity 0.15s; }
+  .it:hover .del { opacity: 1; }
+  .del:hover { background: var(--sd-hover); color: var(--sd-ink); }
+  .del svg { width: 11px; height: 11px; }
+  .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--sd-ink-3); }
+  .foot button { appearance: none; border: 0; background: transparent; color: var(--sd-ink-2); font: inherit; font-size: 11px; cursor: default; padding: 2px 6px; border-radius: 6px; }
+  .foot button:hover { background: var(--sd-hover); color: var(--sd-ink); }
+</style>
+</head>
+<body>
+  <form id="form" autocomplete="off"><input id="text" class="sd-input" placeholder="やることを入力して Enter" aria-label="やること"><button class="sd-btn primary">追加</button></form>
+  <div id="list"></div>
+  <div class="foot"><span id="count"></span><button id="clear">終わったものを消す</button></div>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const X = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg>';
+  let items = [];
+  const save = () => SideDock.storage.set({ items });
+
+  function render() {
+    if (!items.length) {
+      $("list").innerHTML = '<div class="sd-empty">やることはありません</div>';
+    } else {
+      // 終わっていないものを上に
+      const sorted = [...items.filter((i) => !i.done), ...items.filter((i) => i.done)];
+      $("list").replaceChildren(...sorted.map((it) => {
+        const row = document.createElement("div");
+        row.className = `it${it.done ? " done" : ""}`;
+        const c = document.createElement("input");
+        c.type = "checkbox"; c.className = "chk"; c.checked = it.done;
+        c.setAttribute("aria-label", "終わった");
+        c.addEventListener("change", () => { it.done = c.checked; save(); setTimeout(render, 250); });
+        const t = document.createElement("span"); t.className = "t"; t.textContent = it.text;
+        const d = document.createElement("button"); d.className = "del"; d.innerHTML = X; d.setAttribute("aria-label", "消す");
+        d.addEventListener("click", () => { items = items.filter((x) => x !== it); save(); render(); });
+        row.append(c, t, d);
+        return row;
+      }));
+    }
+    const left = items.filter((i) => !i.done).length;
+    $("count").textContent = items.length ? `残り ${left} / ${items.length} 件` : "";
+    $("clear").hidden = !items.some((i) => i.done);
+  }
+
+  $("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = $("text").value.trim();
+    if (!text) return;
+    items.unshift({ id: Date.now().toString(36), text, done: false });
+    $("text").value = "";
+    save(); render();
+  });
+  $("clear").addEventListener("click", () => { items = items.filter((i) => !i.done); save(); render(); });
+  SideDock.on("panelShown", async () => { await SideDock.ui.focus().catch(() => {}); $("text").focus(); });
+  await SideDock.ready;
+  items = (await SideDock.storage.get())?.items ?? [];
+  render();
+</script>
+</body>
+</html>

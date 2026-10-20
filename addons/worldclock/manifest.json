@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.worldclock",
+  "name": "世界時計",
+  "version": "1.0.0",
+  "description": "世界の都市の今の時刻と、日本との時差",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "世界時計", "width": 290 },
+  "permissions": [],
+  "defaultEnabled": false
+}

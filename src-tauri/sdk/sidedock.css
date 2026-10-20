@@ -18,6 +18,7 @@
   --sd-glow: rgba(140, 200, 255, 0.45);
   --sd-danger: #ff9aa2;
   --sd-radius: 10px;
+  --sd-btn-radius: 16px;
   --sd-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --sd-font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
   --sd-font-display: "Segoe UI Variable Display", "Segoe UI", "Yu Gothic UI", system-ui, sans-serif;
@@ -132,7 +133,7 @@ html, body {
   appearance: none; position: relative;
   display: grid; place-items: center;
   width: 32px; height: 32px; padding: 0;
-  border: 0; border-radius: 16px;
+  border: 0; border-radius: var(--sd-btn-radius);
   background: transparent; color: var(--sd-ink);
   font: inherit; cursor: default;
   transition: background 0.2s, transform 0.28s var(--sd-ease);
@@ -152,3 +153,83 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ================================================================ デザイン（スキン）
+   本体の設定「デザイン」に合わせて、:root に data-skin が付く。
+   アクセントカラーは本体が --sd-accent / --sd-accent-ink / --sd-glow を直接渡す */
+:root[data-skin="minimal"] { --sd-radius: 6px; --sd-btn-radius: 8px; --sd-glow: transparent; }
+:root[data-skin="minimal"] .sd-btn.primary { box-shadow: none; }
+:root[data-skin="minimal"] .sd-range::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3); }
+
+:root[data-skin="neon"] {
+  --sd-radius: 8px; --sd-btn-radius: 10px;
+  --sd-surface: color-mix(in srgb, var(--sd-accent) 7%, rgba(255, 255, 255, 0.03));
+  --sd-line: color-mix(in srgb, var(--sd-accent) 30%, transparent);
+  --sd-hover: color-mix(in srgb, var(--sd-accent) 14%, transparent);
+  --sd-press: color-mix(in srgb, var(--sd-accent) 22%, transparent);
+}
+:root[data-skin="neon"] .sd-btn.primary { box-shadow: 0 0 14px -2px var(--sd-accent), inset 0 0 0 1px color-mix(in srgb, var(--sd-accent) 60%, white); }
+:root[data-skin="neon"] .sd-range::-webkit-slider-runnable-track { box-shadow: 0 0 8px -1px var(--sd-glow); }
+:root[data-skin="neon"] .sd-range::-webkit-slider-thumb { background: var(--sd-accent); box-shadow: 0 0 10px 1px var(--sd-accent); }
+
+:root[data-skin="soft"] { --sd-radius: 14px; --sd-btn-radius: 14px; }
+:root[data-skin="soft"] .sd-btn { box-shadow: none; background: color-mix(in srgb, var(--sd-accent) 9%, var(--sd-surface)); }
+:root[data-skin="soft"] .sd-btn:hover { background: color-mix(in srgb, var(--sd-accent) 16%, var(--sd-surface)); }
+:root[data-skin="soft"] .sd-btn.ghost { background: transparent; }
+:root[data-skin="soft"] .sd-btn.primary { background: var(--sd-accent); box-shadow: 0 8px 18px -8px var(--sd-glow); }
+:root[data-skin="soft"] .sd-input, :root[data-skin="soft"] .sd-select { box-shadow: none; }
+:root[data-skin="soft"] .sd-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; }
+:root[data-skin="soft"] .sd-range::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -5px; }
+
+:root[data-skin="classic"] {
+  --sd-radius: 0; --sd-btn-radius: 0;
+  --sd-surface: #c0c0c0; --sd-surface-2: #c0c0c0;
+  --sd-line: #808080; --sd-hover: rgba(0, 0, 128, 0.08); --sd-press: rgba(0, 0, 0, 0.08);
+  --sd-ink: #000000; --sd-ink-2: #3a3a3a; --sd-ink-3: #6a6a6a;
+  --sd-glow: transparent;
+  --sd-bv-hi: #ffffff; --sd-bv-lo: #808080; --sd-bv-dk: #0a0a0a; --sd-bv-md: #dfdfdf;
+  --sd-font: "MS UI Gothic", "Tahoma", "Yu Gothic UI", sans-serif;
+  --sd-font-display: "MS UI Gothic", "Tahoma", "Yu Gothic UI", sans-serif;
+  color-scheme: light;
+}
+:root[data-skin="classic"][data-theme="dark"] {
+  --sd-surface: #3a3a3a; --sd-surface-2: #3a3a3a; --sd-line: #1e1e1e;
+  --sd-ink: #eeeeee; --sd-ink-2: #bdbdbd; --sd-ink-3: #8a8a8a;
+  --sd-bv-hi: #7a7a7a; --sd-bv-lo: #1e1e1e; --sd-bv-dk: #000000; --sd-bv-md: #555555;
+  color-scheme: dark;
+}
+:root[data-skin="classic"] .sd-btn {
+  background: var(--sd-surface);
+  box-shadow: inset -1px -1px 0 var(--sd-bv-dk), inset 1px 1px 0 var(--sd-bv-hi), inset -2px -2px 0 var(--sd-bv-lo), inset 2px 2px 0 var(--sd-bv-md);
+  transition: none;
+}
+:root[data-skin="classic"] .sd-btn:active,
+:root[data-skin="classic"] .sd-btn[aria-pressed="true"] {
+  transform: none;
+  box-shadow: inset 1px 1px 0 var(--sd-bv-dk), inset -1px -1px 0 var(--sd-bv-hi), inset 2px 2px 0 var(--sd-bv-lo);
+}
+:root[data-skin="classic"] .sd-btn.ghost { background: transparent; box-shadow: none; }
+:root[data-skin="classic"] .sd-btn.ghost:hover { box-shadow: inset -1px -1px 0 var(--sd-bv-dk), inset 1px 1px 0 var(--sd-bv-hi); background: transparent; }
+:root[data-skin="classic"] .sd-btn.primary { background: var(--sd-accent); color: var(--sd-accent-ink); }
+:root[data-skin="classic"] .sd-input, :root[data-skin="classic"] .sd-select {
+  background: #ffffff; color: #000;
+  box-shadow: inset 1px 1px 0 var(--sd-bv-lo), inset -1px -1px 0 var(--sd-bv-hi), inset 2px 2px 0 var(--sd-bv-dk);
+}
+:root[data-skin="classic"][data-theme="dark"] .sd-input, :root[data-skin="classic"][data-theme="dark"] .sd-select { background: #1a1a1a; color: #eee; }
+:root[data-skin="classic"] .sd-input:focus, :root[data-skin="classic"] .sd-select:focus {
+  background: #ffffff;
+  box-shadow: inset 1px 1px 0 var(--sd-bv-lo), inset -1px -1px 0 var(--sd-bv-hi), inset 2px 2px 0 var(--sd-bv-dk), 0 0 0 1px var(--sd-accent);
+}
+:root[data-skin="classic"][data-theme="dark"] .sd-input:focus { background: #1a1a1a; }
+:root[data-skin="classic"] .sd-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 0;
+  background: var(--sd-surface);
+  box-shadow: inset 1px 1px 0 var(--sd-bv-lo), inset -1px -1px 0 var(--sd-bv-hi);
+}
+:root[data-skin="classic"] .sd-range::-webkit-slider-thumb {
+  width: 11px; height: 20px; margin-top: -8px; border-radius: 0;
+  background: var(--sd-surface);
+  box-shadow: inset -1px -1px 0 var(--sd-bv-dk), inset 1px 1px 0 var(--sd-bv-hi), inset -2px -2px 0 var(--sd-bv-lo);
+}
+:root[data-skin="classic"] .sd-range:hover::-webkit-slider-thumb { transform: none; }
+:root[data-skin="classic"] .sd-bar-btn:hover { transform: none; background: transparent; box-shadow: inset -1px -1px 0 var(--sd-bv-dk), inset 1px 1px 0 var(--sd-bv-hi); }

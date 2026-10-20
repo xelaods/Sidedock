@@ -1,0 +1,12 @@
+{
+  "id": "sidedock.todo",
+  "name": "Todo",
+  "version": "1.0.0",
+  "description": "やることリスト。残りの数がカプセルに出ます",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "panel": { "entry": "panel.html", "title": "Todo", "width": 300 },
+  "permissions": [],
+  "defaultEnabled": false
+}

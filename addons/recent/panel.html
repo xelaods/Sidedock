@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 10px; }
+  #q { min-height: 30px; font-size: 12px; margin-bottom: 6px; border-radius: 9px; }
+  .f { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 9px; cursor: default; transition: background 0.15s; }
+  .f:hover { background: var(--sd-hover); }
+  .f img, .f .ph { width: 20px; height: 20px; flex: none; }
+  .f .ph { border-radius: 5px; background: var(--sd-surface); }
+  .m { flex: 1; min-width: 0; }
+  .n { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p { font-size: 10px; color: var(--sd-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .a { font-size: 10px; color: var(--sd-ink-3); flex: none; }
+  .open-dir { appearance: none; border: 0; background: transparent; color: var(--sd-ink-3); width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; cursor: default; opacity: 0; flex: none; }
+  .f:hover .open-dir { opacity: 1; }
+  .open-dir:hover { background: var(--sd-hover); color: var(--sd-ink); }
+  .open-dir svg { width: 13px; height: 13px; }
+</style>
+</head>
+<body>
+  <input id="q" class="sd-input" type="search" placeholder="名前で絞り込む" aria-label="名前で絞り込む" spellcheck="false">
+  <div id="list"></div>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const FOLDER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>';
+  const icons = new Map();
+  let files = [];
+  const ago = (ms) => {
+    const m = Math.round((Date.now() - ms) / 60000);
+    return m < 60 ? `${Math.max(1, m)} 分前` : m < 1440 ? `${Math.floor(m / 60)} 時間前` : `${Math.floor(m / 1440)} 日前`;
+  };
+  function render() {
+    const q = $("q").value.trim().toLowerCase();
+    const shown = files.filter((f) => !q || f.name.toLowerCase().includes(q)).slice(0, 25);
+    if (!shown.length) { $("list").innerHTML = `<div class="sd-empty">${q ? "見つかりません" : "最近使ったファイルはありません"}</div>`; return; }
+    $("list").replaceChildren(...shown.map((f) => {
+      const row = document.createElement("div");
+      row.className = "f";
+      row.title = f.path;
+      const ic = icons.get(f.path);
+      row.innerHTML = `${ic ? `<img alt="" src="${ic}">` : '<span class="ph"></span>'}<div class="m"><div class="n"></div><div class="p"></div></div><span class="a">${ago(f.at)}</span>${f.isDir ? "" : `<button class="open-dir" aria-label="場所を開く">${FOLDER}</button>`}`;
+      row.querySelector(".n").textContent = f.name;
+      row.querySelector(".p").textContent = f.path.replace(/\\[^\\]+$/, "");
+      row.addEventListener("click", () => { SideDock.app.launch(f.path).catch(() => {}); SideDock.ui.dismiss(); });
+      row.querySelector(".open-dir")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        SideDock.app.launch("explorer.exe", `/select,"${f.path}"`).catch(() => {});
+        SideDock.ui.dismiss();
+      });
+      if (!icons.has(f.path)) {
+        icons.set(f.path, null);
+        SideDock.app.icon(f.path).then((url) => { icons.set(f.path, url); const img = row.querySelector(".ph"); if (img) img.outerHTML = `<img alt="" src="${url}">`; }).catch(() => {});
+      }
+      return row;
+    }));
+  }
+  $("q").addEventListener("input", render);
+  SideDock.on("panelShown", async () => {
+    $("q").value = "";
+    files = await SideDock.files.recent(40).catch(() => []);
+    render();
+  });
+</script>
+</body>
+</html>

@@ -43,6 +43,7 @@ const PERMISSION_LABELS = {
   network: "インターネットに接続する",
   windows: "開いているウィンドウの一覧・切り替え、スタートメニューを開く",
   settings: "Wi-Fi・Bluetooth・明るさ・ダークモードを変える",
+  files: "最近使ったファイルの一覧を見る",
   media: "再生中の音楽を見る・操作する",
   system: "CPU・メモリ・バッテリーの状態を見る",
   clipboard: "コピーした文字の履歴を見る",
@@ -114,17 +115,53 @@ function trigger() {
 
 // --------------------------------------------------------------------- 配色
 
+/** 見た目の種類。neon は暗い面が前提なので、いつもダーク */
+const SKINS = [
+  ["glass", "グラス"],
+  ["minimal", "ミニマル"],
+  ["neon", "ネオン"],
+  ["soft", "ソフト"],
+  ["classic", "クラシック"],
+];
+/** アクセントカラー：[ダークのとき, ダークのときの文字, ライトのとき, ライトのときの文字] */
+const ACCENTS = {
+  blue: ["#8cc8ff", "#06121f", "#0a66c2", "#ffffff"],
+  violet: ["#b8a2ff", "#140b2e", "#6b4fd8", "#ffffff"],
+  pink: ["#ff9ccf", "#2b0a1a", "#d63384", "#ffffff"],
+  orange: ["#ffb36b", "#2a1404", "#d9661f", "#ffffff"],
+  green: ["#7fe0a8", "#04200f", "#1f9d55", "#ffffff"],
+  mono: ["#e8eaed", "#111214", "#2b2d31", "#ffffff"],
+};
+const ACCENT_LABELS = { blue: "青", violet: "紫", pink: "ピンク", orange: "オレンジ", green: "緑", mono: "モノクロ" };
+
 function computeDark() {
+  if (state.config.skin === "neon") return true;
   const t = state.config.theme;
   return t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+}
+
+/** 今の配色でのアクセントカラー { accent, ink } */
+function accentColors() {
+  const a = ACCENTS[state.config.accent] ?? ACCENTS.blue;
+  return state.dark ? { accent: a[0], ink: a[1] } : { accent: a[2], ink: a[3] };
+}
+
+function themePayload() {
+  return { dark: state.dark, skin: state.config.skin || "glass", accent: accentColors() };
 }
 
 function applyTheme() {
   state.dark = computeDark();
   const root = document.documentElement;
   root.dataset.theme = state.dark ? "dark" : "light";
-  root.style.colorScheme = state.dark ? "dark" : "light";
-  broadcast("theme", { dark: state.dark });
+  root.dataset.skin = state.config.skin || "glass";
+  root.style.colorScheme = state.config.skin === "classic" ? "" : state.dark ? "dark" : "light";
+  const { accent, ink } = accentColors();
+  const n = parseInt(accent.slice(1), 16);
+  root.style.setProperty("--sd-accent", accent);
+  root.style.setProperty("--sd-accent-ink", ink);
+  root.style.setProperty("--sd-glow", `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${state.dark ? 0.45 : 0.3})`);
+  broadcast("theme", themePayload());
 }
 
 // --------------------------------------------------------------------- 位置と当たり判定
@@ -381,7 +418,9 @@ function createFrame(addon, slot) {
   });
   // allow-same-origin を付けないので、アドオンは本体の API に直接触れない
   iframe.setAttribute("sandbox", "allow-scripts allow-forms");
-  iframe.src = `${addonUrl(addon.id, entry)}?slot=${slot}&theme=${state.dark ? "dark" : "light"}`;
+  const t = themePayload();
+  const q = new URLSearchParams({ slot, theme: t.dark ? "dark" : "light", skin: t.skin, accent: t.accent.accent, ink: t.accent.ink });
+  iframe.src = `${addonUrl(addon.id, entry)}?${q}`;
   return iframe;
 }
 
@@ -714,6 +753,8 @@ const API = {
   "clipboard.remove": { perm: "clipboard", run: (f, p) => invoke("clipboard_remove", { id: String(p.id) }) },
   "clipboard.pin": { perm: "clipboard", run: (f, p) => invoke("clipboard_pin", { id: String(p.id), pinned: !!p.pinned }) },
   "clipboard.clear": { perm: "clipboard", run: () => invoke("clipboard_clear") },
+  // 文字をコピーするだけなら権限はいらない（読み取りはできない）
+  "clipboard.write": { run: (f, p) => invoke("clipboard_write", { text: String(p.text ?? "").slice(0, 100000) }) },
 
   "windows.list": { perm: "windows", run: () => invoke("windows_list") },
   "windows.icon": { perm: "windows", run: (f, p) => invoke("windows_icon", { id: Number(p.id), exe: String(p.exe ?? "") }) },
@@ -733,6 +774,15 @@ const API = {
     run: async () => {
       const [level, charging] = await invoke("battery_get");
       return level == null ? null : { level, charging };
+    },
+  },
+
+  "files.recent": { perm: "files", run: (f, p) => invoke("recent_files", { limit: Number(p.limit) || 30 }) },
+  "system.netSpeed": {
+    perm: "system",
+    run: async () => {
+      const [rx, tx] = await invoke("net_speed");
+      return { rx, tx };
     },
   },
 
@@ -769,7 +819,7 @@ window.addEventListener("message", async (e) => {
     sendEvent(frame, "init", {
       addonId: frame.addonId,
       slot: frame.slot,
-      dark: state.dark,
+      ...themePayload(),
       permissions: addon?.permissions ?? [],
       visible: state.phase === "shown",
     });
@@ -994,12 +1044,14 @@ function renderSettings() {
   const quitBtn = el("button", { className: "sd-btn ghost quit", textContent: "終了" });
   quitBtn.addEventListener("click", () => invoke("quit"));
 
-  root.replaceChildren(
+  root.replaceChildren(...[
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.6.0" })),
+      el("span", { className: "s-ver", textContent: "0.7.0" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
+    el("div", { className: "s-sec", textContent: "デザイン" }),
+    renderDesign(),
     el("div", { className: "s-sec", textContent: "アドオン" }),
     el("div", { id: "s-addons" }, renderAddonList()),
     el("div", { className: "s-actions" }, openFolder, reloadBtn, quitBtn),
@@ -1010,6 +1062,48 @@ function renderSettings() {
       className: "s-foot",
       textContent: "アドオンフォルダに manifest.json を含むフォルダを置いて「読み直す」を押すと、一覧に出てきます。",
     }),
+  ].filter(Boolean));
+}
+
+/** 設定の「デザイン」：見た目の見本とアクセントカラー */
+function renderDesign() {
+  const c = state.config;
+  const cards = SKINS.map(([id, label]) => {
+    const b = el("button", { className: "skin-card", ariaLabel: `デザイン：${label}` },
+      el("span", { className: `mini ${id}` }, el("i"), el("i"), el("i")),
+      el("span", { textContent: label }));
+    b.setAttribute("aria-pressed", String((c.skin || "glass") === id));
+    b.addEventListener("click", async () => {
+      for (const x of cards) x.setAttribute("aria-pressed", String(x === b));
+      await saveConfig({ skin: id });
+      applyTheme();
+      // カプセルの大きさが変わるデザインもあるので、置き直す
+      requestAnimationFrame(() => { placeDock(); layoutPanel({ morph: false }); });
+      updateThemeNote();
+    });
+    return b;
+  });
+  const dots = Object.keys(ACCENTS).map((id) => {
+    const b = el("button", { className: "accent-dot", ariaLabel: `アクセントカラー：${ACCENT_LABELS[id]}`, title: ACCENT_LABELS[id] });
+    b.style.setProperty("--c", state.dark ? ACCENTS[id][0] : ACCENTS[id][2]);
+    b.setAttribute("aria-pressed", String((c.accent || "blue") === id));
+    b.addEventListener("click", async () => {
+      for (const x of dots) x.setAttribute("aria-pressed", String(x === b));
+      await saveConfig({ accent: id });
+      applyTheme();
+    });
+    return b;
+  });
+  const note = el("div", { className: "s-sub s-theme-note" });
+  const updateThemeNote = () => {
+    note.textContent = state.config.skin === "neon" ? "ネオンはいつもダークで表示します" : "";
+    note.hidden = state.config.skin !== "neon";
+  };
+  updateThemeNote();
+  return el("div", { className: "s-group" },
+    el("div", { className: "s-design" }, el("div", { className: "skins" }, ...cards)),
+    row("アクセントカラー", null, el("div", { className: "accents" }, ...dots)),
+    note,
   );
 }
 

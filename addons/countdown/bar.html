@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  #btn { width: auto; min-width: 32px; padding: 0 10px 0 8px; gap: 6px; display: inline-flex; }
+  #btn:hover { transform: none; }
+  #btn svg { width: 16px; height: 16px; flex: none; }
+  #name { font-size: 11.5px; color: var(--sd-ink-2); max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+  #days { font: 600 12px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; }
+  #name:empty, #days:empty { display: none; }
+  body.today #days { color: var(--sd-accent); }
+</style>
+</head>
+<body>
+  <button id="btn" class="sd-bar-btn" aria-label="カウントダウン" data-hint="カウントダウン">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/></svg>
+    <span id="name"></span><span id="days"></span>
+  </button>
+<script type="module">
+  import { upcoming, label } from "./common.js";
+  let data = null;
+  function render() {
+    const next = upcoming(data?.events ?? [])[0];
+    document.getElementById("name").textContent = next ? next.name : "";
+    document.getElementById("days").textContent = next ? (next.days === 0 ? "今日" : `${next.days}日`) : "";
+    document.body.classList.toggle("today", next?.days === 0);
+    document.getElementById("btn").dataset.hint = next ? `${next.name}：${label(next.days)}（${next.date.replaceAll("-", "/")}）` : "カウントダウン（予定を追加）";
+  }
+  SideDock.on("storageChanged", (d) => { data = d; render(); });
+  await SideDock.ready;
+  data = await SideDock.storage.get();
+  render();
+  // 日付が変わったら表示し直す
+  setInterval(render, 10 * 60_000);
+</script>
+</body>
+</html>

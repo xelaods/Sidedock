@@ -24,6 +24,18 @@
   --hint-bg: rgba(14, 15, 19, 0.88);
   --divider: rgba(255, 255, 255, 0.1);
   --grain-opacity: 0.07;
+
+  /* 形と素材（デザインごとに変える） */
+  --cap-radius: 20px;
+  --panel-radius: 18px;
+  --btn-radius: 16px;
+  --material-bg: linear-gradient(180deg, var(--glass-top), var(--glass-bot));
+  --material-shadow:
+    inset 0 1px 0 var(--rim-top),
+    inset 0 0 0 1px var(--rim),
+    0 0 0 1px var(--outline),
+    0 16px 36px -12px var(--shadow-1),
+    0 3px 8px -2px var(--shadow-2);
 }
 :root[data-theme="light"] {
   --glass-top: rgba(255, 255, 255, 0.92);
@@ -63,13 +75,8 @@ body.is-suspended #stage { visibility: hidden; }
 
 #capsule,
 #panel-glass {
-  background: linear-gradient(180deg, var(--glass-top), var(--glass-bot));
-  box-shadow:
-    inset 0 1px 0 var(--rim-top),
-    inset 0 0 0 1px var(--rim),
-    0 0 0 1px var(--outline),
-    0 16px 36px -12px var(--shadow-1),
-    0 3px 8px -2px var(--shadow-2);
+  background: var(--material-bg);
+  box-shadow: var(--material-shadow);
 }
 /* 細かい粒子（フィルムグレイン） */
 #capsule::before,
@@ -128,7 +135,7 @@ body.is-suspended #stage { visibility: hidden; }
   isolation: isolate;
   display: flex; align-items: center; gap: 2px;
   height: 40px; padding: 0 4px;
-  border-radius: 20px;
+  border-radius: var(--cap-radius);
   transform-origin: 50% 0;
   /* 隠れるとき：すっと上へ吸い込まれる */
   opacity: 0;
@@ -220,7 +227,7 @@ body.is-suspended #stage { visibility: hidden; }
   appearance: none; position: relative;
   display: grid; place-items: center;
   width: 32px; height: 32px; padding: 0;
-  border: 0; border-radius: 16px;
+  border: 0; border-radius: var(--btn-radius);
   background: transparent;
   color: color-mix(in srgb, var(--sd-ink) 82%, transparent);
   cursor: default;
@@ -300,7 +307,7 @@ body.is-suspended #stage { visibility: hidden; }
   left: var(--px, 0px);
   width: var(--pw, 300px);
   height: var(--ph, 120px);
-  border-radius: 18px;
+  border-radius: var(--panel-radius);
   isolation: isolate;
   transform-origin: var(--ox, 50%) 0;
   pointer-events: none;
@@ -467,6 +474,182 @@ body[data-edge="bottom"].is-shown.settled .icon-btn.hover { transform: translate
 .s-actions .quit { margin-left: auto; color: var(--sd-danger); }
 .s-notice { margin-top: 10px; font-size: 11px; color: var(--sd-danger); white-space: pre-wrap; }
 .s-foot { margin: 10px 2px 0; font-size: 11px; color: var(--sd-ink-3); line-height: 1.5; }
+
+/* ================================================================ デザイン（スキン）
+   設定の「デザイン」で切り替える。:root[data-skin="…"] で、素材・形・動きを上書きする。
+   既定の「グラス」は上で定義したもの */
+
+/* ---------------------------------------------------------------- ミニマル
+   ガラスの質感や光の演出をやめた、平らで静かな見た目。動きも短く */
+:root[data-skin="minimal"] {
+  --cap-radius: 12px;
+  --panel-radius: 12px;
+  --btn-radius: 8px;
+  --grain-opacity: 0;
+  --material-bg: #1c1d21;
+  --material-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 20px -10px rgba(0, 0, 0, 0.7);
+  --hint-bg: #1c1d21;
+}
+:root[data-skin="minimal"][data-theme="light"] {
+  --material-bg: #ffffff;
+  --material-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 8px 20px -12px rgba(20, 24, 40, 0.35);
+  --hint-bg: #ffffff;
+}
+:root[data-skin="minimal"] #sweep,
+:root[data-skin="minimal"] #spot { display: none; }
+/* 隠れているときだけ形を変える（出ているときの位置は既定のまま） */
+:root[data-skin="minimal"] body:not(.is-shown) #capsule { transform: translateY(-8px); filter: none; }
+:root[data-skin="minimal"] #panel:not(.open) { transform: translateY(-6px); filter: none; }
+:root[data-skin="minimal"] body:not(.is-shown) .item { transform: none; filter: none; }
+:root[data-skin="minimal"] body[data-edge="bottom"]:not(.is-shown) #capsule { transform: translateY(8px); }
+:root[data-skin="minimal"] body[data-edge="bottom"] #panel:not(.open) { transform: translateY(6px); }
+:root[data-skin="minimal"] #handle { border-radius: 2px; }
+:root[data-skin="minimal"] .icon-btn::after,
+:root[data-skin="minimal"] .bar-slot::after { width: 12px; height: 2px; margin-left: -6px; border-radius: 1px; box-shadow: none; }
+
+/* ---------------------------------------------------------------- ネオン
+   夜の街のように、真っ暗な面の縁がアクセントカラーで光る（いつもダーク） */
+:root[data-skin="neon"] {
+  --cap-radius: 14px;
+  --panel-radius: 14px;
+  --btn-radius: 10px;
+  --grain-opacity: 0.05;
+  --material-bg:
+    radial-gradient(120% 140% at 50% -40%, color-mix(in srgb, var(--sd-accent) 16%, transparent), transparent 60%),
+    linear-gradient(180deg, #0e1018, #07080c);
+  --material-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--sd-accent) 55%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--sd-accent) 70%, white),
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 18px -2px color-mix(in srgb, var(--sd-accent) 55%, transparent),
+    0 0 48px -12px color-mix(in srgb, var(--sd-accent) 70%, transparent),
+    0 16px 30px -14px rgba(0, 0, 0, 0.9);
+  --spot: color-mix(in srgb, var(--sd-accent) 30%, transparent);
+  --sheen: color-mix(in srgb, var(--sd-accent) 60%, white);
+  --hint-bg: #0b0c12;
+  --divider: color-mix(in srgb, var(--sd-accent) 35%, transparent);
+}
+:root[data-skin="neon"] #handle {
+  background: var(--sd-accent);
+  box-shadow: 0 0 calc(6px + var(--prox) * 18px) calc(1px + var(--prox) * 3px) var(--sd-accent);
+}
+:root[data-skin="neon"] .icon-btn.hover,
+:root[data-skin="neon"] .icon-btn.active { color: var(--sd-accent); filter: drop-shadow(0 0 6px var(--sd-accent)); }
+:root[data-skin="neon"] #hint { box-shadow: 0 0 0 1px color-mix(in srgb, var(--sd-accent) 55%, transparent), 0 0 16px -4px var(--sd-accent); }
+
+/* ---------------------------------------------------------------- ソフト
+   大きな丸みと、アクセントカラーをほんのり混ぜた柔らかい面。影も大きくふんわり */
+:root[data-skin="soft"] {
+  --cap-radius: 24px;
+  --panel-radius: 24px;
+  --btn-radius: 14px;
+  --grain-opacity: 0;
+  --material-bg: color-mix(in srgb, var(--sd-accent) 9%, #17171d);
+  --material-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 24px 48px -18px color-mix(in srgb, var(--sd-accent) 30%, rgba(0, 0, 0, 0.8)),
+    0 4px 12px -4px rgba(0, 0, 0, 0.45);
+  --hint-bg: color-mix(in srgb, var(--sd-accent) 12%, #17171d);
+}
+:root[data-skin="soft"][data-theme="light"] {
+  --material-bg: color-mix(in srgb, var(--sd-accent) 7%, #ffffff);
+  --material-shadow:
+    inset 0 1px 0 #ffffff,
+    0 24px 48px -18px color-mix(in srgb, var(--sd-accent) 40%, rgba(40, 30, 80, 0.4)),
+    0 4px 12px -4px rgba(40, 30, 80, 0.12);
+  --hint-bg: color-mix(in srgb, var(--sd-accent) 8%, #ffffff);
+}
+:root[data-skin="soft"] #capsule { height: 44px; padding: 0 6px; }
+:root[data-skin="soft"] .icon-btn.active { background: color-mix(in srgb, var(--sd-accent) 18%, transparent); }
+:root[data-skin="soft"] #handle { height: 6px; border-radius: 3px; }
+
+/* ---------------------------------------------------------------- クラシック
+   昔の Windows のような、灰色の面と立体の縁。角は四角く、動きはカチッと */
+:root[data-skin="classic"] {
+  --cap-radius: 0;
+  --panel-radius: 0;
+  --btn-radius: 0;
+  --grain-opacity: 0;
+  --bevel-hi: #ffffff;
+  --bevel-lo: #808080;
+  --bevel-dk: #0a0a0a;
+  --bevel-mid: #dfdfdf;
+  --material-bg: #c0c0c0;
+  --material-shadow:
+    inset -1px -1px 0 var(--bevel-dk), inset 1px 1px 0 var(--bevel-hi),
+    inset -2px -2px 0 var(--bevel-lo), inset 2px 2px 0 var(--bevel-mid),
+    3px 3px 0 rgba(0, 0, 0, 0.35);
+  --hint-bg: #ffffe1;
+  --divider: #808080;
+  --sd-font: "MS UI Gothic", "Tahoma", "Yu Gothic UI", sans-serif;
+  --sd-font-display: "MS UI Gothic", "Tahoma", "Yu Gothic UI", sans-serif;
+}
+:root[data-skin="classic"][data-theme="dark"] {
+  --bevel-hi: #7a7a7a;
+  --bevel-lo: #1e1e1e;
+  --bevel-dk: #000000;
+  --bevel-mid: #555555;
+  --material-bg: #3a3a3a;
+  --hint-bg: #3a3a3a;
+  --divider: #1e1e1e;
+}
+:root[data-skin="classic"] body { font-family: var(--sd-font); }
+:root[data-skin="classic"] #sweep,
+:root[data-skin="classic"] #spot { display: none; }
+:root[data-skin="classic"] #capsule { padding: 0 5px; transform: none; filter: none; transition: opacity 0.08s steps(2), visibility 0s linear 0.1s; }
+:root[data-skin="classic"] .is-shown #capsule { transition: opacity 0.08s steps(2); }
+:root[data-skin="classic"] #panel { transform: none; filter: none; transition: opacity 0.08s steps(2), visibility 0s linear 0.1s; }
+:root[data-skin="classic"] #panel.open { transition: opacity 0.08s steps(2), left 0s, top 0s, width 0s, height 0s; }
+:root[data-skin="classic"] .item,
+:root[data-skin="classic"] .view { transform: none !important; filter: none !important; }
+:root[data-skin="classic"] .icon-btn { color: var(--sd-ink); }
+:root[data-skin="classic"] .is-shown.settled .icon-btn.hover { transform: none; background: transparent; box-shadow: inset -1px -1px 0 var(--bevel-dk), inset 1px 1px 0 var(--bevel-hi); }
+:root[data-skin="classic"] .icon-btn.active { background: transparent; color: var(--sd-ink); box-shadow: inset 1px 1px 0 var(--bevel-dk), inset -1px -1px 0 var(--bevel-hi); }
+:root[data-skin="classic"] .icon-btn::after,
+:root[data-skin="classic"] .bar-slot::after { display: none; }
+:root[data-skin="classic"] .divider { width: 2px; background: none; box-shadow: inset 1px 0 0 var(--bevel-lo), inset -1px 0 0 var(--bevel-hi); }
+:root[data-skin="classic"] #hint { border-radius: 0; color: #000; box-shadow: 0 0 0 1px #000; font-weight: 400; }
+:root[data-skin="classic"][data-theme="dark"] #hint { color: #eee; }
+:root[data-skin="classic"] .s-group,
+:root[data-skin="classic"] .skin-card,
+:root[data-skin="classic"] .switch span,
+:root[data-skin="classic"] .switch span::after { border-radius: 0; }
+:root[data-skin="classic"] .s-group { box-shadow: inset 1px 1px 0 var(--bevel-lo), inset -1px -1px 0 var(--bevel-hi); background: transparent; }
+:root[data-skin="classic"] #handle { border-radius: 0; background: var(--material-bg); box-shadow: inset -1px -1px 0 var(--bevel-dk), inset 1px 1px 0 var(--bevel-hi); }
+
+/* ---------------------------------------------------------------- 設定画面のデザイン見本 */
+
+.skins { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.skin-card {
+  appearance: none; border: 0; background: transparent; color: var(--sd-ink-2);
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 6px 2px 5px; border-radius: 10px; font: inherit; font-size: 10.5px; white-space: nowrap; letter-spacing: -0.02em; cursor: default;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+}
+.skin-card:hover { background: var(--sd-hover); color: var(--sd-ink); }
+.skin-card[aria-pressed="true"] { color: var(--sd-ink); box-shadow: inset 0 0 0 1.5px var(--sd-accent); background: color-mix(in srgb, var(--sd-accent) 10%, transparent); }
+.mini { position: relative; width: 48px; height: 18px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.mini i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.7; }
+.mini.glass { border-radius: 9px; background: linear-gradient(180deg, #2f323a, #141519); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 8px -3px rgba(0, 0, 0, 0.6); color: #eef; }
+.mini.minimal { border-radius: 5px; background: #1c1d21; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14); color: #ddd; }
+.mini.minimal i { border-radius: 1px; }
+.mini.neon { border-radius: 6px; background: #0b0c12; box-shadow: inset 0 0 0 1px var(--sd-accent), 0 0 10px -1px var(--sd-accent); color: var(--sd-accent); }
+.mini.soft { border-radius: 10px; height: 20px; background: color-mix(in srgb, var(--sd-accent) 18%, #fff); box-shadow: 0 6px 12px -5px color-mix(in srgb, var(--sd-accent) 60%, transparent); color: #445; }
+.mini.classic { border-radius: 0; background: #c0c0c0; box-shadow: inset -1px -1px 0 #0a0a0a, inset 1px 1px 0 #fff, inset -2px -2px 0 #808080, inset 2px 2px 0 #dfdfdf; color: #000; }
+.mini.classic i { border-radius: 0; opacity: 1; width: 6px; height: 4px; background: #000080; }
+
+.accents { display: flex; gap: 8px; padding: 2px 0; }
+.accent-dot {
+  appearance: none; border: 0; width: 20px; height: 20px; border-radius: 50%; cursor: default;
+  background: var(--c); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  transition: transform 0.3s var(--spring), box-shadow 0.2s;
+}
+.accent-dot:hover { transform: scale(1.12); }
+.accent-dot[aria-pressed="true"] { box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35), 0 0 0 2px var(--c); transform: scale(0.82); }
+.accent-dot[aria-pressed="true"]:hover { transform: scale(0.9); }
+.s-design { padding: 8px; }
+.s-theme-note { padding: 0 12px 8px; }
 
 /* ---------------------------------------------------------------- 動きを減らす設定 */
 

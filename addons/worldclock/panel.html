@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 10px; }
+  .c { display: flex; align-items: center; gap: 10px; padding: 7px 6px 7px 10px; border-radius: 10px; }
+  .c:hover { background: var(--sd-hover); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .dot.day { background: #ffc35a; box-shadow: 0 0 6px rgba(255, 195, 90, 0.6); }
+  .dot.night { background: #7a86c8; }
+  .m { flex: 1; min-width: 0; }
+  .n { font-size: 12.5px; font-weight: 600; }
+  .s { font-size: 10.5px; color: var(--sd-ink-3); }
+  .t { font: 600 20px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .del { appearance: none; border: 0; background: transparent; color: var(--sd-ink-3); width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; cursor: default; opacity: 0; }
+  .c:hover .del { opacity: 1; }
+  .del svg { width: 10px; height: 10px; }
+  .add { display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; box-shadow: inset 0 1px 0 var(--sd-line); }
+  .add .sd-select { min-height: 30px; font-size: 12px; }
+  .add .sd-btn { min-height: 30px; flex: none; }
+</style>
+</head>
+<body>
+  <div id="list"></div>
+  <div class="add"><select id="pick" class="sd-select" aria-label="都市"></select><button id="addbtn" class="sd-btn">追加</button></div>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const X = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg>';
+  const CITIES = [
+    ["ソウル", "Asia/Seoul"], ["台北", "Asia/Taipei"], ["上海", "Asia/Shanghai"], ["香港", "Asia/Hong_Kong"], ["バンコク", "Asia/Bangkok"],
+    ["シンガポール", "Asia/Singapore"], ["ニューデリー", "Asia/Kolkata"], ["ドバイ", "Asia/Dubai"], ["モスクワ", "Europe/Moscow"],
+    ["パリ", "Europe/Paris"], ["ロンドン", "Europe/London"], ["ニューヨーク", "America/New_York"], ["シカゴ", "America/Chicago"],
+    ["ロサンゼルス", "America/Los_Angeles"], ["ホノルル", "Pacific/Honolulu"], ["シドニー", "Australia/Sydney"], ["サンパウロ", "America/Sao_Paulo"],
+  ];
+  let cities = ["Asia/Seoul", "America/New_York", "Europe/London"];
+  $("pick").replaceChildren(...CITIES.map(([n, z]) => new Option(n, z)));
+
+  function offsetMin(zone, d) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric" }).formatToParts(d).map((x) => [x.type, x.value]));
+    return (Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes())) / 60000;
+  }
+  function render() {
+    const now = new Date();
+    const here = -now.getTimezoneOffset();
+    $("list").replaceChildren(...cities.map((z) => {
+      const name = (CITIES.find((c) => c[1] === z) ?? [z])[0];
+      const time = new Intl.DateTimeFormat("ja-JP", { timeZone: z, hour: "2-digit", minute: "2-digit" }).format(now);
+      const day = new Intl.DateTimeFormat("ja-JP", { timeZone: z, month: "numeric", day: "numeric", weekday: "short" }).format(now);
+      const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: z, hour: "numeric", hourCycle: "h23" }).format(now));
+      const diff = (offsetMin(z, now) - here) / 60;
+      const row = document.createElement("div");
+      row.className = "c";
+      row.innerHTML = `<span class="dot ${hour >= 6 && hour < 18 ? "day" : "night"}"></span><div class="m"><div class="n"></div><div class="s">${day}・${diff === 0 ? "時差なし" : `日本より ${Math.abs(diff)} 時間${diff > 0 ? "進んでいる" : "遅れている"}`}</div></div><span class="t">${time}</span><button class="del" aria-label="外す">${X}</button>`;
+      row.querySelector(".n").textContent = name;
+      row.querySelector(".del").addEventListener("click", () => { cities = cities.filter((c) => c !== z); SideDock.storage.set({ cities }); render(); });
+      return row;
+    }));
+  }
+  $("addbtn").addEventListener("click", () => {
+    const z = $("pick").value;
+    if (!cities.includes(z)) { cities.push(z); SideDock.storage.set({ cities }); render(); }
+  });
+  let timer = 0;
+  SideDock.on("panelShown", () => { render(); clearInterval(timer); timer = setInterval(render, 15000); });
+  SideDock.on("panelHidden", () => clearInterval(timer));
+  await SideDock.ready;
+  cities = (await SideDock.storage.get())?.cities ?? cities;
+  render();
+</script>
+</body>
+</html>

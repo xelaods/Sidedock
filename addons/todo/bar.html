@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  #btn { width: auto; min-width: 32px; padding: 0 8px; gap: 5px; display: inline-flex; }
+  #btn:hover { transform: none; }
+  #btn svg { width: 17px; height: 17px; }
+  #n { font: 600 11.5px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; }
+  #n:empty { display: none; }
+  body.done svg { color: var(--sd-accent); }
+</style>
+</head>
+<body>
+  <button id="btn" class="sd-bar-btn" aria-label="Todo" data-hint="Todo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></svg>
+    <span id="n"></span>
+  </button>
+<script type="module">
+  const render = (d) => {
+    const items = d?.items ?? [];
+    const left = items.filter((i) => !i.done).length;
+    document.getElementById("n").textContent = left ? String(left) : "";
+    document.body.classList.toggle("done", items.length > 0 && left === 0);
+    document.getElementById("btn").dataset.hint = items.length ? (left ? `残り ${left} 件：${items.find((i) => !i.done).text}` : "ぜんぶ終わりました") : "Todo";
+  };
+  SideDock.on("storageChanged", render);
+  await SideDock.ready;
+  render(await SideDock.storage.get());
+</script>
+</body>
+</html>

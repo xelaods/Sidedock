@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.qr",
+  "name": "QRコード",
+  "version": "1.0.0",
+  "description": "コピーした URL や文字を QR コードにして、スマホのカメラですぐ開けるようにします",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "QRコード", "width": 280 },
+  "permissions": ["clipboard"],
+  "defaultEnabled": false
+}

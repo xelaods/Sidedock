@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 12px; }
+  .cats { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 8px; }
+  .cats button { appearance: none; border: 0; font: inherit; font-size: 11px; line-height: 22px; padding: 0 8px; border-radius: 11px; background: transparent; color: var(--sd-ink-3); box-shadow: inset 0 0 0 1px var(--sd-line); cursor: default; }
+  .cats button:hover { color: var(--sd-ink); }
+  .cats button[aria-pressed="true"] { background: color-mix(in srgb, var(--sd-accent) 18%, transparent); color: var(--sd-accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sd-accent) 40%, transparent); }
+  .in { display: grid; grid-template-columns: 1fr 110px; gap: 6px; }
+  #v { font: 600 17px/1 var(--sd-font-display); min-height: 38px; font-variant-numeric: tabular-nums; }
+  #u { min-height: 38px; font-size: 12px; }
+  #list { margin-top: 8px; }
+  .r { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 8px; font-size: 12.5px; cursor: default; }
+  .r:hover { background: var(--sd-hover); }
+  .r b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .r span { color: var(--sd-ink-3); }
+  .r.same { display: none; }
+</style>
+</head>
+<body>
+  <div class="cats" id="cats"></div>
+  <div class="in"><input id="v" class="sd-input" inputmode="decimal" value="1" aria-label="値"><select id="u" class="sd-select" aria-label="単位"></select></div>
+  <div id="list"></div>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  // [名前, 基準の単位への倍率]。温度だけは式で
+  const CATS = {
+    "長さ": [["mm", 0.001], ["cm", 0.01], ["m", 1], ["km", 1000], ["インチ", 0.0254], ["フィート", 0.3048], ["ヤード", 0.9144], ["マイル", 1609.344], ["尺", 0.30303]],
+    "重さ": [["mg", 1e-6], ["g", 0.001], ["kg", 1], ["t", 1000], ["オンス", 0.0283495], ["ポンド", 0.453592], ["貫", 3.75]],
+    "温度": [["℃"], ["℉"], ["K"]],
+    "面積": [["cm²", 1e-4], ["m²", 1], ["畳", 1.62], ["坪", 3.30579], ["a", 100], ["ha", 10000], ["km²", 1e6], ["エーカー", 4046.86]],
+    "容量": [["mL", 0.001], ["L", 1], ["合", 0.180391], ["升", 1.80391], ["カップ", 0.2], ["米ガロン", 3.78541], ["m³", 1000]],
+    "速さ": [["m/s", 1], ["km/h", 1 / 3.6], ["mph", 0.44704], ["ノット", 0.514444]],
+    "データ": [["B", 1], ["KB", 1e3], ["MB", 1e6], ["GB", 1e9], ["TB", 1e12], ["KiB", 1024], ["MiB", 1024 ** 2], ["GiB", 1024 ** 3], ["bit", 0.125], ["Mbit", 125000]],
+    "時間": [["秒", 1], ["分", 60], ["時間", 3600], ["日", 86400], ["週", 604800], ["年", 31557600]],
+  };
+  let cat = "長さ";
+  const toC = { "℃": (v) => v, "℉": (v) => (v - 32) * 5 / 9, "K": (v) => v - 273.15 };
+  const fromC = { "℃": (v) => v, "℉": (v) => v * 9 / 5 + 32, "K": (v) => v + 273.15 };
+  const fmt = (v) => Math.abs(v) >= 1e9 || (Math.abs(v) < 1e-4 && v !== 0) ? v.toExponential(4) : v.toLocaleString("ja-JP", { maximumSignificantDigits: 7 });
+
+  function setCat(c) {
+    cat = c;
+    for (const b of $("cats").children) b.setAttribute("aria-pressed", String(b.textContent === c));
+    $("u").replaceChildren(...CATS[c].map(([n]) => new Option(n, n)));
+    $("u").selectedIndex = c === "長さ" || c === "重さ" ? 2 : 0;
+    render();
+  }
+  function render() {
+    const v = parseFloat($("v").value);
+    const from = $("u").value;
+    $("list").replaceChildren(...CATS[cat].map(([n, f]) => {
+      let out = NaN;
+      if (!isNaN(v)) out = cat === "温度" ? fromC[n](toC[from](v)) : (v * CATS[cat].find((x) => x[0] === from)[1]) / f;
+      const r = document.createElement("div");
+      r.className = `r${n === from ? " same" : ""}`;
+      r.innerHTML = "<b></b><span></span>";
+      r.firstChild.textContent = isNaN(out) ? "-" : fmt(out);
+      r.lastChild.textContent = n;
+      r.title = "クリックでコピー";
+      r.addEventListener("click", () => SideDock.clipboard.write(String(isNaN(out) ? "" : +out.toPrecision(10))).catch(() => {}));
+      return r;
+    }));
+  }
+  $("cats").replaceChildren(...Object.keys(CATS).map((c) => {
+    const b = document.createElement("button");
+    b.textContent = c;
+    b.addEventListener("click", () => setCat(c));
+    return b;
+  }));
+  $("v").addEventListener("input", render);
+  $("u").addEventListener("change", render);
+  SideDock.on("panelShown", async () => { await SideDock.ui.focus().catch(() => {}); $("v").focus(); $("v").select(); });
+  setCat("長さ");
+</script>
+</body>
+</html>

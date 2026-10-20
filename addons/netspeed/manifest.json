@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.netspeed",
+  "name": "ネット速度",
+  "version": "1.0.0",
+  "description": "今のダウンロード・アップロードの速さをカプセルに表示します",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "permissions": ["system"],
+  "defaultEnabled": false
+}

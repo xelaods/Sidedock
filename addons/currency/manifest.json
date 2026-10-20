@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.currency",
+  "name": "通貨換算",
+  "version": "1.0.0",
+  "description": "円・ウォン・ドルなどを今のレートで換算します（欧州中央銀行のレート）",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "通貨換算", "width": 300 },
+  "permissions": ["network"],
+  "defaultEnabled": false
+}

@@ -154,6 +154,13 @@ pub fn copy(app: &AppHandle, id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 文字をクリップボードに入れる（翻訳の結果をコピーするときなど）
+pub fn write(text: &str) -> Result<(), String> {
+    arboard::Clipboard::new()
+        .and_then(|mut b| b.set_text(text.to_string()))
+        .map_err(|e| e.to_string())
+}
+
 pub fn remove(app: &AppHandle, id: &str) {
     let mut items = ITEMS.lock().unwrap();
     items.retain(|c| c.id != id);

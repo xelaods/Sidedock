@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.units",
+  "name": "単位換算",
+  "version": "1.0.0",
+  "description": "長さ・重さ・温度・面積・容量・速さ・データ量をまとめて換算します",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "単位換算", "width": 300 },
+  "permissions": [],
+  "defaultEnabled": false
+}

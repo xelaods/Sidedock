@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 use std::sync::Mutex;
-use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, RefreshKind, System};
+use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind, System};
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -21,11 +21,35 @@ pub struct Stats {
     pub charging: bool,
     /// 起動してからの秒数
     pub uptime: u64,
+    /// 通信速度（バイト/秒）。受信と送信
+    pub net_rx: u64,
+    pub net_tx: u64,
 }
 
 static SYS: Mutex<Option<System>> = Mutex::new(None);
 /// ディスクの使用量は重いので 1 分に 1 回だけ調べる
 static DISK: Mutex<Option<(std::time::Instant, u64, u64)>> = Mutex::new(None);
+
+/// 前回からの送受信量を経過時間で割って、今の速度を出す
+static NET: Mutex<Option<(Networks, std::time::Instant)>> = Mutex::new(None);
+
+pub fn net_speed() -> (u64, u64) {
+    let mut g = NET.lock().unwrap();
+    let Some((nets, at)) = g.as_mut() else {
+        *g = Some((
+            Networks::new_with_refreshed_list(),
+            std::time::Instant::now(),
+        ));
+        return (0, 0);
+    };
+    let secs = at.elapsed().as_secs_f64().max(0.2);
+    nets.refresh(true);
+    *at = std::time::Instant::now();
+    let (rx, tx) = nets.iter().fold((0u64, 0u64), |(r, t), (_, d)| {
+        (r + d.received(), t + d.transmitted())
+    });
+    ((rx as f64 / secs) as u64, (tx as f64 / secs) as u64)
+}
 
 fn disk_usage() -> (u64, u64) {
     let mut cache = DISK.lock().unwrap();
@@ -75,6 +99,7 @@ pub fn stats() -> Stats {
         .unwrap_or_default();
 
     let (disk_used, disk_total) = disk_usage();
+    let (net_rx, net_tx) = net_speed();
 
     let (battery, charging) = battery();
     Stats {
@@ -88,6 +113,8 @@ pub fn stats() -> Stats {
         battery,
         charging,
         uptime: System::uptime(),
+        net_rx,
+        net_tx,
     }
 }
 

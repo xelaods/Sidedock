@@ -1,0 +1,12 @@
+{
+  "id": "sidedock.countdown",
+  "name": "カウントダウン",
+  "version": "1.0.0",
+  "description": "旅行・試験・締め切りまでの残り日数をカプセルに表示します",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "panel": { "entry": "panel.html", "title": "カウントダウン", "width": 300 },
+  "permissions": [],
+  "defaultEnabled": false
+}

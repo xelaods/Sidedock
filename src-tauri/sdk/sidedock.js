@@ -11,12 +11,21 @@
   const slot = params.get("slot") === "bar" ? "bar" : "panel";
 
   // 本体の配色をすぐ反映（読み込み直後に白く光らないように）
-  const applyTheme = (dark) => {
+  const COLOR = /^#[0-9a-f]{6}$/i;
+  const applyTheme = (dark, skin, accent) => {
     const root = document.documentElement;
     root.dataset.theme = dark ? "dark" : "light";
-    root.style.colorScheme = dark ? "dark" : "light";
+    root.style.colorScheme = skin === "classic" ? "" : dark ? "dark" : "light";
+    if (typeof skin === "string" && /^[a-z]{1,16}$/.test(skin)) root.dataset.skin = skin;
+    // アクセントカラーは本体が実際の色で渡す（アドオンは色の名前を知らなくてよい）
+    if (accent && COLOR.test(accent.accent ?? "") && COLOR.test(accent.ink ?? "")) {
+      root.style.setProperty("--sd-accent", accent.accent);
+      root.style.setProperty("--sd-accent-ink", accent.ink);
+      const n = parseInt(accent.accent.slice(1), 16);
+      root.style.setProperty("--sd-glow", `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${dark ? 0.45 : 0.3})`);
+    }
   };
-  applyTheme(params.get("theme") !== "light");
+  applyTheme(params.get("theme") !== "light", params.get("skin"), { accent: params.get("accent"), ink: params.get("ink") });
   document.documentElement.dataset.slot = slot;
 
   let seq = 0;
@@ -68,7 +77,7 @@
       d.ok ? p.resolve(d.value) : p.reject(new Error(d.error));
     } else if (d.type === "event") {
       if (d.name === "init") context = d.data;
-      if (d.name === "init" || d.name === "theme") applyTheme(d.data.dark);
+      if (d.name === "init" || d.name === "theme") applyTheme(d.data.dark, d.data.skin, d.data.accent);
       if (d.name === "panelShown") panelOpen = true;
       if (d.name === "init") setVisible(d.data.visible);
       if (d.name === "revealed") setVisible(true);
@@ -164,7 +173,7 @@
   window.SideDock = Object.freeze({
     /** "bar"（カプセルに並ぶウィジェット）か "panel"（下に開くパネル） */
     slot,
-    /** 本体との接続が済むと解決する。{ addonId, slot, dark, permissions } */
+    /** 本体との接続が済むと解決する。{ addonId, slot, dark, skin, accent, permissions } */
     ready,
     get context() { return context; },
     /** カプセルが今出ているか */
@@ -212,8 +221,14 @@
       seek: (seconds) => call("media.seek", { seconds }),
     },
     system: {
-      /** { cpu, cpuName, cores, memUsed, memTotal, diskUsed, diskTotal, battery, charging, uptime } */
+      /** { cpu, cpuName, cores, memUsed, memTotal, diskUsed, diskTotal, battery, charging, uptime, netRx, netTx } */
       stats: () => call("system.stats"),
+      /** 今の通信速度（バイト/秒）{ rx, tx }。続けて呼ぶと、その間の平均になる */
+      netSpeed: () => call("system.netSpeed"),
+    },
+    files: {
+      /** 最近使ったファイル：[{ name, path, at, isDir }]（権限 files） */
+      recent: (limit = 30) => call("files.recent", { limit }),
     },
     power: {
       /** "lock" | "sleep" | "restart" | "shutdown" | "signout" */
@@ -225,6 +240,8 @@
       remove: (id) => call("clipboard.remove", { id }),
       pin: (id, pinned) => call("clipboard.pin", { id, pinned }),
       clear: () => call("clipboard.clear"),
+      /** 文字をコピーする（権限なしで使える） */
+      write: (text) => call("clipboard.write", { text }),
     },
     windows: {
       /** 開いているウィンドウ：[{ id, title, exe, minimized, active }] */

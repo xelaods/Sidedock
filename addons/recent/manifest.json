@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.recent",
+  "name": "最近のファイル",
+  "version": "1.0.0",
+  "description": "最近開いたファイルやフォルダをすぐに開けます",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "panel": { "entry": "panel.html", "title": "最近のファイル", "width": 320 },
+  "permissions": ["files", "app"],
+  "defaultEnabled": false
+}
