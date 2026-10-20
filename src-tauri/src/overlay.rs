@@ -59,6 +59,8 @@ pub struct Overlay {
     suspended: AtomicBool,
     /// 自分以外で最後に前面にあったウィンドウ（パネルを閉じたらフォーカスを返す）
     last_foreground: AtomicIsize,
+    /// 画面の下端（タスクバーの位置）に出すか
+    pub bottom: AtomicBool,
 }
 
 impl Overlay {
@@ -68,6 +70,7 @@ impl Overlay {
             rects: Mutex::new(Vec::new()),
             suspended: AtomicBool::new(false),
             last_foreground: AtomicIsize::new(0),
+            bottom: AtomicBool::new(false),
         }
     }
 
@@ -80,7 +83,17 @@ impl Overlay {
     }
 }
 
-/// メインディスプレイの上端（作業領域の上端）に、全幅でウィンドウを合わせる。
+/// 出す端を変える（"top" | "bottom"）。すぐに配置し直す
+pub fn set_edge(app: &AppHandle, edge: &str) {
+    app.state::<Overlay>()
+        .bottom
+        .store(edge == "bottom", Ordering::SeqCst);
+    if layout(app) {
+        let _ = app.emit_to("main", "geometry", ());
+    }
+}
+
+/// メインディスプレイの上端（または下端）に、全幅でウィンドウを合わせる。
 /// 位置が変わったら true
 pub fn layout(app: &AppHandle) -> bool {
     let Some(win) = app.get_webview_window("main") else {
@@ -91,14 +104,20 @@ pub fn layout(app: &AppHandle) -> bool {
     };
     let scale = mon.scale_factor();
     let wa = mon.work_area();
+    let ov = app.state::<Overlay>();
+    let h = (WINDOW_HEIGHT * scale).round() as u32;
+    let y = if ov.bottom.load(Ordering::SeqCst) {
+        wa.position.y + wa.size.height as i32 - h as i32
+    } else {
+        wa.position.y
+    };
     let next = Geom {
         x: wa.position.x,
-        y: wa.position.y,
+        y,
         w: wa.size.width,
-        h: (WINDOW_HEIGHT * scale).round() as u32,
+        h,
         scale,
     };
-    let ov = app.state::<Overlay>();
     let mut g = ov.geom.lock().unwrap();
     if *g == next {
         return false;
@@ -243,7 +262,8 @@ pub fn start(app: AppHandle) {
             let y = (pos.y - geom.y as f64) / geom.scale;
             let width = geom.w as f64 / geom.scale;
             let in_columns = x >= -1.0 && x <= width + 1.0;
-            let near = in_columns && y <= WINDOW_HEIGHT + NEAR_MARGIN;
+            // 上端に出すときも下端に出すときも、ウィンドウの近くにいる間だけ
+            let near = in_columns && (-NEAR_MARGIN..=WINDOW_HEIGHT + NEAR_MARGIN).contains(&y);
 
             // クリックを受け取るかどうか（カプセルとパネルの上だけ受け取る）
             let over = in_columns && ov.rects.lock().unwrap().iter().any(|r| r.contains(x, y));

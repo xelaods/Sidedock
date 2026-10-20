@@ -115,6 +115,7 @@ fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Result
     let config = config.sanitize();
     config::save(&app, &config)?;
     taskbar::set_hidden(config.hide_taskbar);
+    overlay::set_edge(&app, &config.edge);
     *state.config.lock().unwrap() = config.clone();
     let _ = app.emit("config-changed", &config);
     Ok(config)

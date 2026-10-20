@@ -27,7 +27,7 @@ const TRIGGERS = {
 const HIDE_DELAY = 420; // カーソルが離れてから引っ込むまで
 const HOVER_OPEN = 230; // 項目にとどまってパネルが開くまで
 const HOVER_SWITCH = 80; // パネルが開いている間に隣へ移ったとき
-const PANEL_TOP = 58;
+const PANEL_GAP = 10; // カプセルとパネルの間
 const PANEL_MAX_H = 380;
 const SIDE_MARGIN = 16;
 const LEAVE_PAD = 22; // カプセル・パネルの外側にこれだけ余裕を持たせる
@@ -137,6 +137,13 @@ function capsuleRect() {
   return { x: dock.offsetLeft + c.offsetLeft, y: dock.offsetTop + c.offsetTop, w: c.offsetWidth, h: c.offsetHeight };
 }
 
+/** 画面の下端（タスクバーの位置）に出しているか */
+const atBottom = () => state.config?.edge === "bottom";
+
+function applyEdge() {
+  document.body.dataset.edge = atBottom() ? "bottom" : "top";
+}
+
 function placeDock() {
   const w = capsule().offsetWidth;
   const pos = state.config.position;
@@ -157,14 +164,19 @@ function inside(p, r) {
 function nearInteractive(p, pad) {
   if (!p) return false;
   const c = capsuleRect();
-  // カプセルの上は画面の端まで含める（上端に押し付けたままでも引っ込まない）
-  const top = { x: c.x - pad, y: -50, w: c.w + pad * 2, h: c.y + c.h + pad + 50 };
-  if (inside(p, top)) return true;
+  // カプセルから画面の端までを含める（端に押し付けたままでも引っ込まない）
+  const edge = atBottom()
+    ? { x: c.x - pad, y: c.y - pad, w: c.w + pad * 2, h: innerHeight - c.y + pad + 50 }
+    : { x: c.x - pad, y: -50, w: c.w + pad * 2, h: c.y + c.h + pad + 50 };
+  if (inside(p, edge)) return true;
   if (state.panelRect && inside(p, grow(state.panelRect, pad))) return true;
   // カプセルとパネルの間の隙間
   if (state.panelRect) {
     const r = state.panelRect;
-    const gap = { x: Math.min(c.x, r.x), y: c.y + c.h, w: Math.max(c.x + c.w, r.x + r.w) - Math.min(c.x, r.x), h: r.y - (c.y + c.h) };
+    const x0 = Math.min(c.x, r.x), x1 = Math.max(c.x + c.w, r.x + r.w);
+    const gap = atBottom()
+      ? { x: x0, y: r.y + r.h, w: x1 - x0, h: c.y - (r.y + r.h) }
+      : { x: x0, y: c.y + c.h, w: x1 - x0, h: r.y - (c.y + c.h) };
     if (inside(p, gap)) return true;
   }
   return false;
@@ -175,8 +187,10 @@ function syncHitRects() {
   const rects = [];
   if (state.phase === "shown" && !state.suspended) {
     const c = capsuleRect();
-    // 上端に押し付けたままでもクリックできるよう、カプセルの上は画面の端まで
-    rects.push({ x: c.x - 4, y: 0, w: c.w + 8, h: c.y + c.h + 4 });
+    // 端に押し付けたままでもクリックできるよう、カプセルから画面の端まで
+    rects.push(atBottom()
+      ? { x: c.x - 4, y: c.y - 4, w: c.w + 8, h: innerHeight - c.y + 4 }
+      : { x: c.x - 4, y: 0, w: c.w + 8, h: c.y + c.h + 4 });
     if (state.panelRect) rects.push(grow(state.panelRect, 2));
   }
   invoke("set_hit_rects", { rects }).catch(() => {});
@@ -237,7 +251,9 @@ function scheduleHide() {
 function inTriggerZone(p) {
   const t = trigger();
   const c = capsuleRect();
-  return p.y <= t.h && p.y >= -4 && p.x >= c.x - t.spread && p.x <= c.x + c.w + t.spread;
+  const inX = p.x >= c.x - t.spread && p.x <= c.x + c.w + t.spread;
+  if (atBottom()) return inX && p.y >= innerHeight - t.h && p.y <= innerHeight + 4;
+  return inX && p.y <= t.h && p.y >= -4;
 }
 
 /** 隠れている間：上端の印をカーソルの近さで光らせる */
@@ -246,7 +262,7 @@ function updateProximity(p) {
   if (p) {
     const c = capsuleRect();
     const dx = Math.max(0, Math.abs(p.x - (c.x + c.w / 2)) - c.w / 2);
-    const dy = Math.max(0, p.y);
+    const dy = Math.max(0, atBottom() ? innerHeight - p.y : p.y);
     prox = clamp(1 - Math.hypot(dx, dy * 1.6) / 180, 0, 1);
     prox = prox * prox; // 近づくほど急に明るく
   }
@@ -258,7 +274,7 @@ function updateSpot(p) {
   const spot = $("#spot");
   if (!p || state.phase !== "shown") return spot.style.setProperty("--spot-o", "0");
   const c = capsuleRect();
-  const onBar = p.y <= c.y + c.h + 10 && p.x >= c.x - 30 && p.x <= c.x + c.w + 30;
+  const onBar = (atBottom() ? p.y >= c.y - 10 : p.y <= c.y + c.h + 10) && p.x >= c.x - 30 && p.x <= c.x + c.w + 30;
   spot.style.setProperty("--mx", `${p.x - c.x}px`);
   spot.style.setProperty("--spot-o", onBar ? "1" : "0");
 }
@@ -507,10 +523,14 @@ function layoutPanel({ morph = true } = {}) {
   s.setProperty("--pw", `${w}px`);
   s.setProperty("--ph", `${h}px`);
   s.setProperty("--ox", `${clamp(cx - x, 16, w - 16)}px`);
+  // 上端ならカプセルの下へ、下端ならカプセルの上へ開く
+  const c = capsuleRect();
+  const y = atBottom() ? c.y - PANEL_GAP - h : c.y + c.h + PANEL_GAP;
+  s.setProperty("--py", `${y}px`);
   const view = viewOf(id);
   view.style.setProperty("--vw", `${w}px`);
   view.style.setProperty("--vmax", `${PANEL_MAX_H}px`);
-  state.panelRect = { x, y: PANEL_TOP, w, h };
+  state.panelRect = { x, y, w, h };
   syncHitRects();
 }
 
@@ -872,7 +892,15 @@ function renderSettings() {
   invoke("autostart_get").then((on) => (autostart.querySelector("input").checked = on)).catch(() => {});
 
   const display = el("div", { className: "s-group" },
-    row("出てくる位置", null,
+    row("出てくる場所", c.edge === "bottom" ? "画面の下（タスクバーの位置）" : "画面の上",
+      seg([["top", "上"], ["bottom", "下"]], c.edge, async (v) => {
+        await saveConfig({ edge: v });
+        applyEdge();
+        const sub = document.querySelector(".s-edge .s-sub");
+        if (sub) sub.textContent = v === "bottom" ? "画面の下（タスクバーの位置）" : "画面の上";
+        requestAnimationFrame(() => { placeDock(); layoutPanel({ morph: false }); });
+      }), "s-edge"),
+    row("横の位置", null,
       seg([["left", "左"], ["center", "中央"], ["right", "右"]], c.position, async (v) => {
         await saveConfig({ position: v });
         placeDock();
@@ -920,7 +948,7 @@ function renderSettings() {
   root.replaceChildren(
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.4.0" })),
+      el("span", { className: "s-ver", textContent: "0.4.1" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
     el("div", { className: "s-sec", textContent: "アドオン" }),
@@ -946,6 +974,7 @@ async function start() {
   state.addons = new Map(data.addons.map((a) => [a.id, a]));
 
   applyTheme();
+  applyEdge();
   renderBar();
   log(`UI を起動: アドオン ${data.addons.length} 個、全画面中=${data.suspended}、画面 ${innerWidth}×${innerHeight}、エラー ${data.errors.length} 件`);
   for (const e of data.errors) log(`アドオンの読み込みエラー: ${e}`);

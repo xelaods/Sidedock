@@ -292,7 +292,7 @@ body.is-suspended #stage { visibility: hidden; }
 /* ---------------------------------------------------------------- パネル */
 
 #panel {
-  position: absolute; top: 58px;
+  position: absolute; top: var(--py, 58px);
   left: var(--px, 0px);
   width: var(--pw, 300px);
   height: var(--ph, 120px);
@@ -318,10 +318,32 @@ body.is-suspended #stage { visibility: hidden; }
     transform 0.56s var(--spring),
     filter 0.32s var(--ease),
     left 0.5s var(--spring),
+    top 0.5s var(--spring),
     width 0.5s var(--spring),
     height 0.5s var(--spring);
 }
 #panel.no-morph { transition-property: opacity, transform, filter !important; }
+
+/* ---------------------------------------------------------------- 画面の下端（タスクバーの位置）に出すとき
+   動きの向きをすべて上下反対にする */
+
+body[data-edge="bottom"] #dock { top: auto; bottom: 0; padding-top: 0; padding-bottom: 8px; }
+body[data-edge="bottom"] #handle { top: auto; bottom: 3px; }
+body[data-edge="bottom"].is-shown #handle { transform: translateY(-6px) scaleX(2.2) scaleY(0.4); }
+body[data-edge="bottom"] #capsule { transform-origin: 50% 100%; transform: translateY(18px) scale(0.84, 0.6); }
+body[data-edge="bottom"].is-shown #capsule { transform: none; }
+body[data-edge="bottom"] .item { transform: translateY(6px) scale(0.88); }
+body[data-edge="bottom"].is-shown .item { transform: none; }
+body[data-edge="bottom"] #spot { background: radial-gradient(84px 44px at var(--mx, -200px) 100%, var(--spot), transparent 72%); }
+body[data-edge="bottom"] .icon-btn::after,
+body[data-edge="bottom"] .bar-slot::after { bottom: auto; top: -1px; }
+body[data-edge="bottom"] #hint { top: auto; bottom: 56px; transform: translate(-50%, 4px) scale(0.96); }
+body[data-edge="bottom"] #hint.show { transform: translate(-50%, 0) scale(1); }
+body[data-edge="bottom"] #panel { transform-origin: var(--ox, 50%) 100%; transform: translateY(10px) scale(0.96); }
+body[data-edge="bottom"] #panel.open { transform: none; }
+body[data-edge="bottom"] .view { transform: translateY(-6px); }
+body[data-edge="bottom"] .view.active { transform: none; }
+body[data-edge="bottom"].is-shown.settled .icon-btn.hover { transform: translateY(-1px) scale(1.07); }
 
 #panel-glass { position: absolute; inset: 0; border-radius: inherit; z-index: -1; }
 

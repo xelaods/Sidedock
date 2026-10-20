@@ -1,6 +1,6 @@
 [package]
 name = "sidedock"
-version = "0.4.0"
+version = "0.4.1"
 description = "画面上部に隠れていて、近づくと出てくるランチャー"
 authors = ["xelaods"]
 edition = "2021"

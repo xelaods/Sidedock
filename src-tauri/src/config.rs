@@ -14,7 +14,9 @@ pub struct AddonEntry {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Config {
-    /// 画面上部のどこに出すか："left" | "center" | "right"
+    /// 画面の上端と下端のどちらに出すか："top" | "bottom"（タスクバーの位置）
+    pub edge: String,
+    /// 端のどこに出すか："left" | "center" | "right"
     pub position: String,
     /// 近づいたときに反応する範囲："narrow" | "normal" | "wide"
     pub trigger: String,
@@ -31,6 +33,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            edge: "top".into(),
             position: "center".into(),
             trigger: "normal".into(),
             theme: "dark".into(),
@@ -45,6 +48,9 @@ impl Config {
     /// 値の範囲を正す（手で config.json を書き換えた場合や、古い版の設定の保険）
     pub fn sanitize(mut self) -> Self {
         let d = Self::default();
+        if !matches!(self.edge.as_str(), "top" | "bottom") {
+            self.edge = d.edge.clone();
+        }
         if !matches!(self.position.as_str(), "left" | "center" | "right") {
             self.position = d.position;
         }
