@@ -204,6 +204,15 @@ mod win {
         }
     }
 
+    /// 借りているアイコン（破棄しない）を PNG の data URL にする
+    pub fn hicon_png(hicon: HICON) -> Result<String, String> {
+        let png = unsafe { hicon_to_png(hicon) }?;
+        Ok(format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(png)
+        ))
+    }
+
     unsafe fn hicon_to_png(hicon: HICON) -> Result<Vec<u8>, String> {
         let mut ii = ICONINFO::default();
         GetIconInfo(hicon, &mut ii).map_err(|e| e.to_string())?;

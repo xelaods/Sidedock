@@ -30,9 +30,9 @@ export const ICONS = {
   note: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>',
 };
 
-/** 再生中のメディアを見張る。変わるたびに onChange(info, art) を呼ぶ */
+/** 再生中のメディアを見張る。変わるたびに onChange(info, art) を呼ぶ（カプセルが隠れている間は止まる） */
 export function watch(onChange, interval = 1000) {
-  let artKey = null, art = null, timer = 0, stopped = false;
+  let artKey = null, art = null;
   async function tick() {
     try {
       const info = await SideDock.media.get();
@@ -45,11 +45,6 @@ export function watch(onChange, interval = 1000) {
     } catch {
       onChange(null, null);
     }
-    if (!stopped) timer = setTimeout(tick, interval);
   }
-  tick();
-  return {
-    stop() { stopped = true; clearTimeout(timer); },
-    now() { clearTimeout(timer); tick(); },
-  };
+  return SideDock.poll(tick, { visible: interval, hidden: 0 });
 }

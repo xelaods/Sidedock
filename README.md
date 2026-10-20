@@ -7,6 +7,8 @@
 
 | アドオン | できること |
 | --- | --- |
+| タスクバー | スタートボタンと、開いているアプリのアイコン。クリックで切り替え・最小化、中クリックで新しく開く、右クリックでウィンドウ一覧（閉じるボタン付き） |
+| 通知とトレイ | トレイの隠れたアイコン一覧・クイック設定（Wi-Fi・音量）・通知センターを開く |
 | ★ 時計 | 日付と時刻 |
 | ★ 再生中の音楽 | Spotify・Apple Music・YouTube などの曲名とジャケット、再生/一時停止・曲送り・再生位置の変更。カプセルの上でホイールを回すと曲送り |
 | ★ アプリのショートカット | よく使うアプリやフォルダを並べる（ドラッグ＆ドロップでも追加） |
@@ -49,6 +51,21 @@ npm run build    # インストーラーを作る（src-tauri\target\release\bun
 - 検索や音量などは、アイコンにカーソルをとどめるとパネルが開く（クリックでもすぐ開く）
 - 歯車から **設定**：出てくる位置（左・中央・右）、反応する範囲（狭い・普通・広い）、テーマ、Windows の起動時に開く、アドオンの並べ替えと有効/無効
 - Esc で引っ込める
+
+### Windows のタスクバーの代わりに使う
+
+設定の「Windows のタスクバーを隠す」をオンにすると、Windows のタスクバーを隠し、「タスクバー」「通知とトレイ」のアドオンが有効になります。「表示のしかた」を「常に表示」にすると、カプセルがいつも画面上部に出ている状態になります。
+
+- SideDock を終了すると、タスクバーは元に戻ります
+- スタートメニュー（Win キー）を開いている間は、Windows が自分でタスクバーを出します。閉じると SideDock がまた隠します
+- トレイのアイコンを見たいときは「通知とトレイ」の ∧ を押すと、一時的にタスクバーのトレイ一覧が開きます
+- もし SideDock が落ちてタスクバーが隠れたままになったら、SideDock をもう一度起動するか、タスクマネージャー（Ctrl+Shift+Esc）で「エクスプローラー」を再起動すると戻ります
+
+### 軽さのための工夫
+
+- カーソルが画面上部から離れている間は、カーソルを調べる回数を 60 回/秒から約 11 回/秒に落とす
+- カプセルが隠れている間は、アドオンのアニメーションを止め、音量・再生中の曲・CPU などの取得も止める（出てきた瞬間に取り直す）
+- 隠れてしばらくすると、WebView2 に使っていないメモリを手放してもらう
 - 終了はタスクトレイのメニューか、設定の一番下から
 
 ### しくみ
@@ -109,6 +126,7 @@ my-addon/
 | `system` | `SideDock.system.stats()` で CPU・メモリ・ディスク・バッテリー |
 | `clipboard` | `SideDock.clipboard.list()` / `copy(id)` / `pin(id, true)` / `remove(id)` / `clear()`、`clipboardChanged` イベント |
 | `power` | `SideDock.power.action("lock" \| "sleep" \| "restart" \| "shutdown" \| "signout")` |
+| `windows` | `SideDock.windows.list()` / `icon(id, exe)` / `activate(id)` / `focus(id)` / `close(id)`、`SideDock.shell.action("start" \| "quick" \| "notifications" \| "desktop" \| "tray" \| "taskview")` |
 
 権限がなくても、`SideDock.storage.get()` / `set(data)` でアドオン専用の保存領域（JSON）が使えます。
 
@@ -141,6 +159,7 @@ my-addon/
 - 要素に `data-hint="説明"` を付けると、カーソルを乗せたときカプセルの下に説明が出る
 - UI の操作：`ui.openPanel()` `ui.closePanel()` `ui.togglePanel()` `ui.focus()`（キーボード入力を受け取る）`ui.dismiss()`（引っ込める）`ui.notify(文字, ミリ秒)`（カプセルを出して知らせる）
 - manifest.json に `"defaultEnabled": false` と書くと、最初はオフの状態で一覧に出る
+- `SideDock.poll(関数, { visible: 1000, hidden: 0 })` で、カプセルが出ている間だけ定期的に呼べる（隠れている間は止まり、出てきた瞬間に 1 回呼ばれる）。`SideDock.visible` で今出ているか分かる
 - イベント：`init` `theme` `panelShown` `panelHidden` `storageChanged` `drop` `revealed` `concealed`
 - アドオンはサンドボックス化された iframe で動き、本体とは `postMessage` 経由でしかやり取りできない。`alert()` などのダイアログは使えない
 
@@ -154,6 +173,7 @@ src-tauri/src/
   media.rs          再生中のメディア（Windows のメディアコントロール）
   sysmon.rs         CPU・メモリ・バッテリー、電源の操作
   clipboard.rs      クリップボードの履歴
+  taskbar.rs        ウィンドウの一覧・切り替え、スタートメニュー、タスクバーを隠す
   log.rs            診断ログ
   system.rs         音量、アプリ起動、アイコン取得、ブラウザ一覧
   addons.rs         アドオンの読み込み、addon:// の配信、保存領域

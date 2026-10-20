@@ -36,6 +36,13 @@
 
   // パネルが今開いているか。あとから on("panelShown") したときにもすぐ知らせるため
   let panelOpen = false;
+  // カプセルが今出ているか。隠れている間はアニメーションを止め、ポーリングを減らす（軽量化）
+  let visible = false;
+  const setVisible = (v) => {
+    visible = !!v;
+    document.documentElement.dataset.visible = String(visible);
+  };
+  setVisible(false);
 
   function on(name, fn) {
     if (!handlers.has(name)) handlers.set(name, new Set());
@@ -63,6 +70,9 @@
       if (d.name === "init") context = d.data;
       if (d.name === "init" || d.name === "theme") applyTheme(d.data.dark);
       if (d.name === "panelShown") panelOpen = true;
+      if (d.name === "init") setVisible(d.data.visible);
+      if (d.name === "revealed") setVisible(true);
+      if (d.name === "concealed") setVisible(false);
       if (d.name === "panelHidden") panelOpen = false;
       emit(d.name, d.data);
     }
@@ -125,12 +135,41 @@
     if (e.target.matches?.(".sd-range")) paintRange(e.target);
   });
 
+  /**
+   * fn を繰り返し呼ぶ。カプセルが出ている間は visible ミリ秒ごと、隠れている間は hidden ミリ秒ごと
+   * （hidden を 0 にすると隠れている間は止める）。出てきた瞬間にもすぐ 1 回呼ぶ
+   */
+  function poll(fn, { visible: shownMs = 1000, hidden: hiddenMs = 0 } = {}) {
+    let timer = 0, stopped = false, running = false;
+    const run = async () => {
+      clearTimeout(timer);
+      if (stopped) return;
+      if (!running) {
+        running = true;
+        try { await fn(); } catch (e) { console.error(e); }
+        running = false;
+      }
+      const wait = visible ? shownMs : hiddenMs;
+      if (wait > 0 && !stopped) timer = setTimeout(run, wait);
+    };
+    const off = on("revealed", () => run());
+    const offHide = on("concealed", () => { if (!hiddenMs) clearTimeout(timer); });
+    ready.then(run);
+    return {
+      now: run,
+      stop() { stopped = true; clearTimeout(timer); off(); offHide(); },
+    };
+  }
+
   window.SideDock = Object.freeze({
     /** "bar"（カプセルに並ぶウィジェット）か "panel"（下に開くパネル） */
     slot,
     /** 本体との接続が済むと解決する。{ addonId, slot, dark, permissions } */
     ready,
     get context() { return context; },
+    /** カプセルが今出ているか */
+    get visible() { return visible; },
+    poll,
     call,
     /** イベント：init / theme / panelShown / panelHidden / storageChanged / drop / revealed / concealed / clipboardChanged */
     on,
@@ -186,6 +225,19 @@
       remove: (id) => call("clipboard.remove", { id }),
       pin: (id, pinned) => call("clipboard.pin", { id, pinned }),
       clear: () => call("clipboard.clear"),
+    },
+    windows: {
+      /** 開いているウィンドウ：[{ id, title, exe, minimized, active }] */
+      list: () => call("windows.list"),
+      icon: (id, exe) => call("windows.icon", { id, exe }),
+      /** 使っていたウィンドウなら最小化、そうでなければ前面へ */
+      activate: (id) => call("windows.activate", { id }),
+      focus: (id) => call("windows.focus", { id }),
+      close: (id) => call("windows.close", { id }),
+    },
+    shell: {
+      /** "start" | "quick" | "notifications" | "desktop" | "tray" | "taskview" */
+      action: (action) => call("shell.action", { action }),
     },
     volume: {
       get: () => call("volume.get"),

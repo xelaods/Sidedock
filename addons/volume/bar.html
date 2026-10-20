@@ -81,10 +81,8 @@
     refresh();
   });
 
-  await SideDock.ready;
-  refresh();
-  // 他のアプリやキーボードで変えた音量にも追いつく
-  setInterval(() => { if (!sending) refresh(); }, 1500);
+  // 他のアプリやキーボードで変えた音量にも追いつく（隠れている間は調べない）
+  SideDock.poll(() => (sending ? null : refresh()), { visible: 1500, hidden: 0 });
 </script>
 </body>
 </html>

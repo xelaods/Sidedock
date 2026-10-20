@@ -41,6 +41,7 @@ const PERMISSION_LABELS = {
   browser: "ブラウザでページを開く",
   volume: "音量を変える",
   network: "インターネットに接続する",
+  windows: "開いているウィンドウの一覧・切り替え、スタートメニューを開く",
   media: "再生中の音楽を見る・操作する",
   system: "CPU・メモリ・バッテリーの状態を見る",
   clipboard: "コピーした文字の履歴を見る",
@@ -65,7 +66,7 @@ const state = {
   panelRect: null,
   cursor: null,
   dark: true,
-  timers: { dwell: 0, hide: 0, hover: 0, settle: 0, notice: 0 },
+  timers: { dwell: 0, hide: 0, hover: 0, settle: 0, notice: 0, lowmem: 0 },
 };
 
 // --------------------------------------------------------------------- 共通
@@ -183,12 +184,18 @@ function syncHitRects() {
 
 // --------------------------------------------------------------------- 出し入れ
 
+/** 「常に表示」の設定か（タスクバーの代わりに使うとき向け） */
+const alwaysShow = () => state.config?.show === "always";
+
 function reveal({ pinned = false } = {}) {
   if (state.suspended) return;
   if (pinned) state.pinned = true;
   clearTimer("hide");
   if (state.phase === "shown") return;
   state.phase = "shown";
+  // 出ている間は WebView2 に普段どおりメモリを使ってもらう
+  clearTimer("lowmem");
+  invoke("set_low_memory", { low: false }).catch(() => {});
   log("出てきた");
   document.body.classList.remove("settled");
   document.body.classList.add("is-shown");
@@ -201,6 +208,7 @@ function reveal({ pinned = false } = {}) {
 
 function conceal() {
   if (state.phase !== "shown" || state.holdOpen > 0) return;
+  if (alwaysShow() && !state.suspended) return;
   closePanel();
   hideHint();
   state.phase = "hidden";
@@ -213,10 +221,13 @@ function conceal() {
   syncHitRects();
   invoke("release_focus").catch(() => {});
   broadcast("concealed", {});
+  // 隠れてしばらくしたら、WebView2 に使っていないメモリを手放してもらう（軽量化）
+  clearTimer("lowmem");
+  state.timers.lowmem = setTimeout(() => invoke("set_low_memory", { low: true }).catch(() => {}), 2500);
 }
 
 function scheduleHide() {
-  if (state.timers.hide || state.pinned || state.holdOpen > 0) return;
+  if (state.timers.hide || state.pinned || state.holdOpen > 0 || alwaysShow()) return;
   state.timers.hide = setTimeout(() => {
     state.timers.hide = 0;
     if (!nearInteractive(state.cursor, LEAVE_PAD)) conceal();
@@ -295,6 +306,7 @@ function onSuspend(on) {
     updateProximity(null);
   }
   syncHitRects();
+  if (!on && alwaysShow()) reveal();
 }
 
 // --------------------------------------------------------------------- ヒント
@@ -657,6 +669,21 @@ const API = {
   "clipboard.pin": { perm: "clipboard", run: (f, p) => invoke("clipboard_pin", { id: String(p.id), pinned: !!p.pinned }) },
   "clipboard.clear": { perm: "clipboard", run: () => invoke("clipboard_clear") },
 
+  "windows.list": { perm: "windows", run: () => invoke("windows_list") },
+  "windows.icon": { perm: "windows", run: (f, p) => invoke("windows_icon", { id: Number(p.id), exe: String(p.exe ?? "") }) },
+  "windows.activate": { perm: "windows", run: (f, p) => invoke("windows_activate", { id: Number(p.id) }) },
+  "windows.focus": { perm: "windows", run: (f, p) => invoke("windows_focus", { id: Number(p.id) }) },
+  "windows.close": { perm: "windows", run: (f, p) => invoke("windows_close", { id: Number(p.id) }) },
+  "shell.action": {
+    perm: "windows",
+    run: async (f, p) => {
+      const action = String(p.action);
+      // スタートや通知センターは SideDock の上に重なるので、先に引っ込める
+      if (action !== "tray") { state.holdOpen = 0; state.pinned = false; conceal(); }
+      await invoke("shell_action", { action });
+    },
+  },
+
   "volume.get": { perm: "volume", run: () => invoke("volume_get") },
   "volume.set": { perm: "volume", run: (f, p) => invoke("volume_set", { level: Number(p.level) }) },
   "volume.setMute": { perm: "volume", run: (f, p) => invoke("volume_set_mute", { muted: !!p.muted }) },
@@ -676,6 +703,7 @@ window.addEventListener("message", async (e) => {
       slot: frame.slot,
       dark: state.dark,
       permissions: addon?.permissions ?? [],
+      visible: state.phase === "shown",
     });
     // 初めて開いたパネルは、読み込みが終わってから「表示された」ことを知らせる
     if (frame.slot === "panel" && state.active === frame.addonId) sendEvent(frame, "panelShown", {});
@@ -831,6 +859,11 @@ function refreshSettings() {
   if (state.active === "settings") layoutPanel();
 }
 
+function refreshShowSub(v) {
+  const sub = document.querySelector(".s-show .s-sub");
+  if (sub) sub.textContent = v === "always" ? "いつもカプセルを出しておく" : "上端に近づけたときだけ出す";
+}
+
 function renderSettings() {
   const root = $("#settings-inner");
   const c = state.config;
@@ -848,12 +881,33 @@ function renderSettings() {
       })),
     row("反応する範囲", "上端に近づけたとき",
       seg([["narrow", "狭い"], ["normal", "普通"], ["wide", "広い"]], c.trigger, (v) => saveConfig({ trigger: v }))),
+    row("表示のしかた", c.show === "always" ? "いつもカプセルを出しておく" : "上端に近づけたときだけ出す",
+      seg([["hover", "近づけたとき"], ["always", "常に表示"]], c.show, async (v) => {
+        await saveConfig({ show: v });
+        if (v === "always") reveal();
+        else scheduleHide();
+        refreshShowSub(v);
+      }), "s-show"),
     row("テーマ", null,
       seg([["system", "自動"], ["light", "ライト"], ["dark", "ダーク"]], c.theme, async (v) => {
         await saveConfig({ theme: v });
         applyTheme();
       })),
     row("Windows の起動時に開く", null, autostart),
+    row("Windows のタスクバーを隠す", "SideDock をタスクバーの代わりに使う。終了すると元に戻ります",
+      toggle(c.hideTaskbar, "Windows のタスクバーを隠す", async (v) => {
+        await saveConfig({ hideTaskbar: v });
+        // 隠すときは、タスクバーの代わりになるアドオンも有効にする
+        if (v) {
+          const want = ["sidedock.taskbar", "sidedock.tray"];
+          const addons = state.config.addons.map((a) => (want.includes(a.id) ? { ...a, enabled: true } : a));
+          if (addons.some((a, i) => a.enabled !== state.config.addons[i].enabled)) {
+            await saveConfig({ addons });
+            renderBar();
+            refreshSettings();
+          }
+        }
+      })),
   );
 
   const openFolder = el("button", { className: "sd-btn", textContent: "アドオンフォルダを開く" });
@@ -866,7 +920,7 @@ function renderSettings() {
   root.replaceChildren(
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.3.0" })),
+      el("span", { className: "s-ver", textContent: "0.4.0" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
     el("div", { className: "s-sec", textContent: "アドオン" }),
@@ -916,6 +970,7 @@ async function start() {
     if (e.key !== "Escape") return;
     if (state.active) closePanel();
     else conceal();
+    if (alwaysShow()) invoke("release_focus").catch(() => {});
   });
 
   // ドロップされたファイルは drop 権限のあるアドオンへ
@@ -940,6 +995,11 @@ async function start() {
     openPanel("settings", { focus: true });
   });
 
+  // 「常に表示」ならそのまま出しておく
+  if (alwaysShow()) {
+    setTimeout(() => reveal(), 300);
+    return;
+  }
   // 起動したら一度だけ姿を見せて、ここにいることを知らせる
   setTimeout(() => {
     reveal({ pinned: true });

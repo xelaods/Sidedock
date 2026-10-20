@@ -6,6 +6,7 @@ mod media;
 mod overlay;
 mod sysmon;
 mod system;
+mod taskbar;
 
 use addons::AddonInfo;
 use config::{AddonEntry, Config};
@@ -52,6 +53,7 @@ fn reload(app: &AppHandle) -> InitData {
         ids.sort();
         // 同梱アドオンの初期の並び順
         let preferred = [
+            "sidedock.taskbar",
             "sidedock.clock",
             "sidedock.media",
             "sidedock.shortcuts",
@@ -60,6 +62,7 @@ fn reload(app: &AppHandle) -> InitData {
             "sidedock.notes",
             "sidedock.timer",
             "sidedock.volume",
+            "sidedock.tray",
         ];
         ids.sort_by_key(|id| preferred.iter().position(|p| p == id).unwrap_or(usize::MAX));
         let mut changed = false;
@@ -67,7 +70,17 @@ fn reload(app: &AppHandle) -> InitData {
             if !c.addons.iter().any(|a| a.id == id) {
                 // 同梱は最初から有効。自分で入れたアドオンは権限を確認してから有効にしてもらう
                 let enabled = found[&id].builtin && found[&id].default_enabled;
-                c.addons.push(AddonEntry { id, enabled });
+                // 決まった並び順があるものは、その位置に差し込む（後から増えた同梱アドオン向け）
+                let rank = |x: &str| preferred.iter().position(|p| *p == x);
+                let at = match rank(&id) {
+                    Some(r) => c
+                        .addons
+                        .iter()
+                        .position(|a| rank(&a.id).is_none_or(|ar| ar > r))
+                        .unwrap_or(c.addons.len()),
+                    None => c.addons.len(),
+                };
+                c.addons.insert(at, AddonEntry { id, enabled });
                 changed = true;
             }
         }
@@ -101,6 +114,7 @@ fn init(app: AppHandle) -> InitData {
 fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Result<Config, String> {
     let config = config.sanitize();
     config::save(&app, &config)?;
+    taskbar::set_hidden(config.hide_taskbar);
     *state.config.lock().unwrap() = config.clone();
     let _ = app.emit("config-changed", &config);
     Ok(config)
@@ -298,6 +312,62 @@ fn clipboard_clear(app: AppHandle) {
     clipboard::clear(&app);
 }
 
+#[tauri::command(async)]
+fn windows_list(app: AppHandle) -> Vec<taskbar::WindowInfo> {
+    taskbar::list(overlay::last_foreground(&app))
+}
+
+#[tauri::command(async)]
+fn windows_icon(id: i64, exe: String) -> Result<String, String> {
+    taskbar::icon(id, &exe)
+}
+
+#[tauri::command(async)]
+fn windows_activate(app: AppHandle, id: i64) -> Result<(), String> {
+    taskbar::activate(id, overlay::last_foreground(&app))
+}
+
+#[tauri::command(async)]
+fn windows_focus(id: i64) {
+    taskbar::focus(id);
+}
+
+#[tauri::command(async)]
+fn windows_close(id: i64) {
+    taskbar::close(id);
+}
+
+#[tauri::command(async)]
+fn shell_action(action: String) -> Result<(), String> {
+    taskbar::shell(&action)
+}
+
+/// 隠れている間は WebView2 にメモリを手放してもらう（軽量化）
+#[tauri::command]
+fn set_low_memory(app: AppHandle, low: bool) {
+    #[cfg(windows)]
+    if let Some(w) = main_window(&app) {
+        let _ = w.with_webview(move |wv| unsafe {
+            use webview2_com::Microsoft::Web::WebView2::Win32::{
+                ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
+                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+            };
+            use windows::core::Interface;
+            if let Ok(core) = wv.controller().CoreWebView2() {
+                if let Ok(v19) = core.cast::<ICoreWebView2_19>() {
+                    let _ = v19.SetMemoryUsageTargetLevel(if low {
+                        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+                    } else {
+                        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+                    });
+                }
+            }
+        });
+    }
+    #[cfg(not(windows))]
+    let _ = (app, low);
+}
+
 // =============================================================================
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -386,6 +456,14 @@ pub fn run() {
                 // ふだんはクリックを下のアプリへ素通しする
                 let _ = w.set_ignore_cursor_events(true);
             }
+            // 設定に合わせてタスクバーを隠す（オフなら、前回落ちて隠れたままのものも戻す）
+            let hide_taskbar = handle
+                .state::<AppState>()
+                .config
+                .lock()
+                .unwrap()
+                .hide_taskbar;
+            taskbar::set_hidden(hide_taskbar);
             overlay::layout(&handle);
             overlay::show(&handle);
             overlay::start(handle);
@@ -425,9 +503,21 @@ pub fn run() {
             clipboard_remove,
             clipboard_pin,
             clipboard_clear,
+            windows_list,
+            windows_icon,
+            windows_activate,
+            windows_focus,
+            windows_close,
+            shell_action,
+            set_low_memory,
         ])
         .build(tauri::generate_context!())
         .expect("SideDock の起動に失敗しました");
 
-    app.run(|_app, _event: RunEvent| {});
+    app.run(|_app, event: RunEvent| {
+        // 終了するときは、隠していた Windows のタスクバーを必ず元に戻す
+        if let RunEvent::Exit = event {
+            taskbar::restore();
+        }
+    });
 }

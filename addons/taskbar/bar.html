@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 0 2px 0 2px; gap: 2px; }
+  /* スタートボタン：4 枚のタイルが、押すと少し開く */
+  #start .logo { display: grid; grid-template-columns: 7px 7px; gap: 1.5px; transition: gap 0.3s var(--sd-ease), transform 0.3s var(--sd-ease); }
+  #start .logo i { width: 7px; height: 7px; border-radius: 1.6px; background: linear-gradient(135deg, #7fd0ff, #3d8cff); }
+  :root[data-theme="light"] #start .logo i { background: linear-gradient(135deg, #2b9cff, #0a5bd6); }
+  #start:hover .logo { gap: 2.5px; }
+  #start:active .logo { transform: scale(0.85); }
+  .sep { width: 1px; height: 16px; margin: 0 4px; background: var(--sd-line); flex: none; }
+  #apps { display: flex; gap: 2px; }
+  #apps:empty + .sep, #apps:empty { display: none; }
+
+  .app { position: relative; }
+  .app img { width: 20px; height: 20px; }
+  .app .letter {
+    width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center;
+    background: var(--sd-surface); box-shadow: inset 0 0 0 1px var(--sd-line);
+    font-size: 10.5px; font-weight: 600; color: var(--sd-ink-2);
+  }
+  .app.min img, .app.min .letter { opacity: 0.55; filter: saturate(0.6); }
+  /* 下の印：開いているウィンドウの数。使っていたアプリは長い線で光る */
+  .app .dots { position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); display: flex; gap: 2px; }
+  .app .dots i { width: 3px; height: 3px; border-radius: 2px; background: var(--sd-ink-3); transition: width 0.35s var(--sd-ease), background 0.2s; }
+  .app.active .dots i:first-child { width: 10px; background: var(--sd-accent); box-shadow: 0 0 6px var(--sd-glow); }
+  .app.active { background: var(--sd-hover); }
+  .app.enter { animation: pop 0.45s var(--sd-ease); }
+  @keyframes pop { from { transform: scale(0.4); opacity: 0; } }
+</style>
+</head>
+<body>
+  <button id="start" class="sd-bar-btn" aria-label="スタート" data-hint="スタート"><span class="logo"><i></i><i></i><i></i><i></i></span></button>
+  <div id="apps"></div>
+  <span class="sep"></span>
+<script type="module">
+  import { group, iconFor, appName } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  const order = [];
+  let groups = [];
+  const nodes = new Map();
+  let lastSig = "";
+
+  function render() {
+    const seen = new Set();
+    groups.forEach((g, i) => {
+      seen.add(g.key);
+      let b = nodes.get(g.key);
+      if (!b) {
+        b = document.createElement("button");
+        b.className = "sd-bar-btn app enter";
+        b.addEventListener("animationend", () => b.classList.remove("enter"), { once: true });
+        b.addEventListener("click", () => onClick(b._g));
+        b.addEventListener("auxclick", (e) => { if (e.button === 1 && b._g.exe) SideDock.app.launch(b._g.exe).catch(() => {}); });
+        b.addEventListener("contextmenu", (e) => { e.preventDefault(); SideDock.ui.openPanel(); });
+        nodes.set(g.key, b);
+      }
+      b._g = g;
+      const icon = iconFor(g, render);
+      const sig = `${icon ? "i" : "l"}${g.windows.length}`;
+      if (b._sig !== sig) {
+        b._sig = sig;
+        b.innerHTML = "";
+        if (icon) {
+          const img = document.createElement("img");
+          img.src = icon; img.alt = "";
+          b.append(img);
+        } else {
+          const l = document.createElement("span");
+          l.className = "letter";
+          l.textContent = (appName(g.windows[0]) || "?").slice(0, 1).toUpperCase();
+          b.append(l);
+        }
+        const dots = document.createElement("span");
+        dots.className = "dots";
+        for (let k = 0; k < Math.min(3, g.windows.length); k++) dots.append(document.createElement("i"));
+        b.append(dots);
+      }
+      const active = g.windows.some((w) => w.active);
+      b.classList.toggle("active", active);
+      b.classList.toggle("min", g.windows.every((w) => w.minimized));
+      const titles = g.windows.map((w) => w.title);
+      b.dataset.hint = titles.length > 1 ? `${titles[0]} ほか ${titles.length - 1} 件` : titles[0];
+      b.setAttribute("aria-label", titles[0]);
+      if ($("apps").children[i] !== b) $("apps").insertBefore(b, $("apps").children[i] ?? null);
+    });
+    for (const [k, b] of nodes) if (!seen.has(k)) { b.remove(); nodes.delete(k); }
+  }
+
+  async function refresh() {
+    const list = await SideDock.windows.list().catch(() => []);
+    const sig = JSON.stringify(list);
+    if (sig === lastSig) return;
+    lastSig = sig;
+    groups = group(list, order);
+    render();
+  }
+
+  /** 1 つなら切り替え・最小化。複数あるなら、使っていたものの次へ順に切り替える */
+  async function onClick(g) {
+    let target = g.windows[0];
+    if (g.windows.length > 1) {
+      const i = g.windows.findIndex((w) => w.active);
+      target = i >= 0 ? g.windows[(i + 1) % g.windows.length] : g.windows[0];
+    }
+    await SideDock.windows.activate(target.id).catch(() => {});
+    setTimeout(() => poller.now(), 150);
+  }
+
+  $("start").addEventListener("click", () => SideDock.shell.action("start").catch(() => {}));
+  const poller = SideDock.poll(refresh, { visible: 1000, hidden: 0 });
+</script>
+</body>
+</html>

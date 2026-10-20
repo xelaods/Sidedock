@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 8px; }
+  .g + .g { margin-top: 4px; padding-top: 4px; box-shadow: inset 0 1px 0 var(--sd-line); }
+  .w {
+    display: flex; align-items: center; gap: 9px; padding: 6px 6px 6px 8px; border-radius: 9px; cursor: default;
+    transition: background 0.18s;
+  }
+  .w:hover { background: var(--sd-hover); }
+  .w.active { background: color-mix(in srgb, var(--sd-accent) 14%, transparent); }
+  .w img, .w .letter { width: 18px; height: 18px; flex: none; }
+  .w .letter { border-radius: 5px; display: grid; place-items: center; background: var(--sd-surface); font-size: 10px; font-weight: 600; color: var(--sd-ink-2); }
+  .w .t { flex: 1; min-width: 0; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w.min .t { color: var(--sd-ink-3); }
+  .w button {
+    appearance: none; border: 0; background: transparent; color: var(--sd-ink-3);
+    width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; cursor: default; opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+  }
+  .w:hover button { opacity: 1; }
+  .w button:hover { background: color-mix(in srgb, var(--sd-danger) 22%, transparent); color: var(--sd-danger); }
+  .w button svg { width: 11px; height: 11px; }
+  .foot { display: flex; gap: 6px; margin-top: 8px; }
+  .foot .sd-btn { flex: 1; min-height: 28px; font-size: 11.5px; }
+</style>
+</head>
+<body>
+  <div id="list"></div>
+  <div class="foot">
+    <button id="view" class="sd-btn">タスクビュー</button>
+    <button id="desk" class="sd-btn">デスクトップを表示</button>
+  </div>
+<script type="module">
+  import { group, iconFor, appName } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  const order = [];
+  const X = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg>';
+
+  async function load() {
+    const list = await SideDock.windows.list().catch(() => []);
+    const groups = group(list, order);
+    if (!groups.length) {
+      const e = document.createElement("div"); e.className = "sd-empty"; e.textContent = "開いているウィンドウはありません";
+      return $("list").replaceChildren(e);
+    }
+    $("list").replaceChildren(...groups.map((g) => {
+      const box = document.createElement("div");
+      box.className = "g";
+      const icon = iconFor(g, load);
+      for (const w of g.windows) {
+        const row = document.createElement("div");
+        row.className = `w${w.active ? " active" : ""}${w.minimized ? " min" : ""}`;
+        if (icon) { const img = document.createElement("img"); img.src = icon; img.alt = ""; row.append(img); }
+        else { const l = document.createElement("span"); l.className = "letter"; l.textContent = appName(w).slice(0, 1).toUpperCase(); row.append(l); }
+        const t = document.createElement("span"); t.className = "t"; t.textContent = w.title; t.title = w.title;
+        const close = document.createElement("button"); close.innerHTML = X; close.setAttribute("aria-label", `${w.title} を閉じる`);
+        close.addEventListener("click", async (e) => { e.stopPropagation(); row.style.opacity = "0.4"; await SideDock.windows.close(w.id); setTimeout(load, 400); });
+        row.append(t, close);
+        row.addEventListener("click", () => { SideDock.windows.focus(w.id); SideDock.ui.dismiss(); });
+        box.append(row);
+      }
+      return box;
+    }));
+  }
+  $("view").addEventListener("click", () => SideDock.shell.action("taskview"));
+  $("desk").addEventListener("click", () => SideDock.shell.action("desktop"));
+  let poller = null;
+  SideDock.on("panelShown", () => { poller?.stop(); poller = SideDock.poll(load, { visible: 1500, hidden: 0 }); });
+  SideDock.on("panelHidden", () => { poller?.stop(); poller = null; });
+</script>
+</body>
+</html>

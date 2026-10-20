@@ -142,6 +142,13 @@ html, body {
 .sd-bar-btn img { width: 20px; height: 20px; pointer-events: none; -webkit-user-drag: none; }
 .sd-bar-btn svg { pointer-events: none; }
 
+/* カプセルが隠れている間は、アニメーションを止めて CPU・GPU を休ませる（軽量化） */
+:root[data-visible="false"] *,
+:root[data-visible="false"] *::before,
+:root[data-visible="false"] *::after {
+  animation-play-state: paused !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }

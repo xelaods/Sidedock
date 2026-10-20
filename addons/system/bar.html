@@ -48,9 +48,7 @@
       }
     } catch {}
   }
-  await SideDock.ready;
-  tick();
-  setInterval(tick, 2000);
+  SideDock.poll(tick, { visible: 2000, hidden: 0 });
 </script>
 </body>
 </html>

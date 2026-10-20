@@ -20,6 +20,10 @@ pub struct Config {
     pub trigger: String,
     /// "system" | "light" | "dark"
     pub theme: String,
+    /// "hover"（近づけたときだけ出る）| "always"（常に表示）
+    pub show: String,
+    /// Windows のタスクバーを隠して、SideDock を代わりに使う
+    pub hide_taskbar: bool,
     /// アドオンの並び順と有効/無効
     pub addons: Vec<AddonEntry>,
 }
@@ -30,6 +34,8 @@ impl Default for Config {
             position: "center".into(),
             trigger: "normal".into(),
             theme: "dark".into(),
+            show: "hover".into(),
+            hide_taskbar: false,
             addons: Vec::new(),
         }
     }
@@ -47,6 +53,9 @@ impl Config {
         }
         if !matches!(self.theme.as_str(), "system" | "light" | "dark") {
             self.theme = d.theme;
+        }
+        if !matches!(self.show.as_str(), "hover" | "always") {
+            self.show = d.show;
         }
         let mut seen = std::collections::HashSet::new();
         self.addons.retain(|a| seen.insert(a.id.clone()));

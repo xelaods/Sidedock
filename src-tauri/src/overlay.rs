@@ -12,7 +12,7 @@ use std::{
         Mutex,
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
@@ -152,15 +152,26 @@ pub fn release_focus(app: &AppHandle) {
     let _ = app;
 }
 
-/// カーソル監視のスレッドを始める
+/// SideDock を触る前に前面にあったウィンドウ
+pub fn last_foreground(app: &AppHandle) -> isize {
+    app.state::<Overlay>()
+        .last_foreground
+        .load(Ordering::SeqCst)
+}
+
+/// カーソル監視のスレッドを始める。
+/// 軽くするため、カーソルが画面上部の近くにあるときだけ約 60 回/秒で調べ、
+/// 離れているときや全画面の間は約 11 回/秒に落とす
 pub fn start(app: AppHandle) {
     thread::spawn(move || {
         let mut last_cursor: Option<Cursor> = None;
         let mut passthrough = true;
-        let mut tick: u64 = 0;
+        let mut fast = true;
+        let mut next_check = Instant::now();
+        let mut next_layout = Instant::now();
         loop {
-            thread::sleep(Duration::from_millis(16));
-            tick = tick.wrapping_add(1);
+            thread::sleep(Duration::from_millis(if fast { 16 } else { 90 }));
+            let now = Instant::now();
             let Some(win) = app.get_webview_window("main") else {
                 continue;
             };
@@ -169,45 +180,51 @@ pub fn start(app: AppHandle) {
             #[cfg(windows)]
             let own = win.hwnd().map(|h| h.0 as isize).unwrap_or(0);
 
-            // 4 回に 1 回（約 15 回/秒）：前面のウィンドウを記録し、全画面かどうかを調べる
-            #[cfg(windows)]
-            if tick.is_multiple_of(4) {
-                let fg = win::foreground_other_than(own);
-                if fg != 0 {
-                    ov.last_foreground.store(fg, Ordering::SeqCst);
-                }
-                let fullscreen = win::fullscreen_on_same_monitor(own);
-                let was = ov.suspended.swap(fullscreen, Ordering::SeqCst);
-                if fullscreen != was {
-                    crate::log::write(
-                        &app,
-                        &format!(
-                            "{}: {}",
-                            if fullscreen {
-                                "全画面を検出したので隠す"
-                            } else {
-                                "全画面が終わったので表示"
-                            },
-                            win::describe_foreground()
-                        ),
-                    );
-                    let _ = app.emit_to("main", "suspend", fullscreen);
-                    if fullscreen {
-                        let _ = win.set_ignore_cursor_events(true);
-                        passthrough = true;
-                        last_cursor = None;
-                        hide(&app);
-                    } else {
-                        show(&app);
+            // 4 回/秒：前面のウィンドウを記録し、全画面かどうかを調べ、隠したタスクバーを隠し直す
+            if now >= next_check {
+                next_check = now + Duration::from_millis(250);
+                crate::taskbar::enforce();
+                #[cfg(windows)]
+                {
+                    let fg = win::foreground_other_than(own);
+                    if fg != 0 {
+                        ov.last_foreground.store(fg, Ordering::SeqCst);
+                    }
+                    let fullscreen = win::fullscreen_on_same_monitor(own);
+                    let was = ov.suspended.swap(fullscreen, Ordering::SeqCst);
+                    if fullscreen != was {
+                        crate::log::write(
+                            &app,
+                            &format!(
+                                "{}: {}",
+                                if fullscreen {
+                                    "全画面を検出したので隠す"
+                                } else {
+                                    "全画面が終わったので表示"
+                                },
+                                win::describe_foreground()
+                            ),
+                        );
+                        let _ = app.emit_to("main", "suspend", fullscreen);
+                        if fullscreen {
+                            let _ = win.set_ignore_cursor_events(true);
+                            passthrough = true;
+                            last_cursor = None;
+                            hide(&app);
+                        } else {
+                            show(&app);
+                        }
                     }
                 }
             }
             if ov.is_suspended() {
+                fast = false;
                 continue;
             }
 
-            // 約 1 秒ごと：解像度・DPI・タスクバーの位置が変わっていないか、最前面を保てているか
-            if tick.is_multiple_of(60) {
+            // 1 回/秒：解像度・DPI・タスクバーの位置が変わっていないか、最前面を保てているか
+            if now >= next_layout {
+                next_layout = now + Duration::from_secs(1);
                 if layout(&app) {
                     let _ = app.emit_to("main", "geometry", ());
                 }
@@ -244,6 +261,7 @@ pub fn start(app: AppHandle) {
                 last_cursor = next;
                 let _ = app.emit_to("main", "cursor", next);
             }
+            fast = near || over;
         }
     });
 }

@@ -73,10 +73,11 @@
     $("btn").dataset.hint = `${t.label ? t.label + "・" : ""}残り ${fmt(left)}${t.left != null ? "（一時停止中）" : ""}`;
   }
 
-  setInterval(() => {
-    if (t.endsAt != null && remaining(t) <= 0) finish();
-    else render();
-  }, 250);
+  // 隠れている間は 1 秒ごとに終わったかだけ見る
+  SideDock.poll(() => {
+    if (t.endsAt != null && remaining(t) <= 0) return finish();
+    render();
+  }, { visible: 250, hidden: 1000 });
 
   SideDock.on("storageChanged", (d) => { t = { ...EMPTY, ...(d ?? {}) }; render(); });
   await SideDock.ready;

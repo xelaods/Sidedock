@@ -1,0 +1,11 @@
+{
+  "id": "sidedock.tray",
+  "name": "通知とトレイ",
+  "version": "1.0.0",
+  "description": "トレイのアイコン一覧・クイック設定・通知センターを開くボタン",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "permissions": ["windows"],
+  "defaultEnabled": false
+}

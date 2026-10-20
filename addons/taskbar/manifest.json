@@ -1,0 +1,12 @@
+{
+  "id": "sidedock.taskbar",
+  "name": "タスクバー",
+  "version": "1.0.0",
+  "description": "スタートボタンと、開いているアプリの切り替え（タスクバーの代わり）",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "panel": { "entry": "panel.html", "title": "開いているウィンドウ", "width": 320, "trigger": "manual" },
+  "permissions": ["windows", "app"],
+  "defaultEnabled": false
+}
