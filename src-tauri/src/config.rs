@@ -11,6 +11,9 @@ pub struct AddonEntry {
     pub enabled: bool,
 }
 
+/// 見た目の改訂の番号（0.9.0 のオブシディアンが 1）
+const UI_REV: u32 = 1;
+
 /// 画面の端でのジェスチャーと、それぞれに割り当てた操作
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
@@ -74,10 +77,13 @@ pub struct Config {
     pub show: String,
     /// Windows のタスクバーを隠して、SideDock を代わりに使う
     pub hide_taskbar: bool,
-    /// 見た目："glass" | "minimal" | "neon" | "soft" | "classic"
+    /// 見た目："obsidian" | "glass" | "minimal" | "neon" | "soft" | "classic"
     pub skin: String,
     /// アクセントカラー："blue" | "violet" | "pink" | "orange" | "green" | "mono"
     pub accent: String,
+    /// 見た目の改訂の番号。古い設定を新しい既定のデザインへ移すのに使う
+    #[serde(default)]
+    pub ui_rev: u32,
     /// 画面の端でのジェスチャー
     pub gestures: Gestures,
     /// アドオンの並び順と有効/無効
@@ -93,8 +99,9 @@ impl Default for Config {
             theme: "dark".into(),
             show: "hover".into(),
             hide_taskbar: false,
-            skin: "glass".into(),
-            accent: "blue".into(),
+            skin: "obsidian".into(),
+            accent: "mono".into(),
+            ui_rev: UI_REV,
             gestures: Gestures::default(),
             addons: Vec::new(),
         }
@@ -120,7 +127,13 @@ impl Config {
         if !matches!(self.show.as_str(), "hover" | "always") {
             self.show = d.show;
         }
-        if !matches!(self.skin.as_str(), "glass" | "minimal" | "neon" | "soft" | "classic") {
+        // 0.9.0 で見た目を刷新した。それより前の設定は、一度だけ新しい既定のデザインへ切り替える
+        if self.ui_rev < UI_REV {
+            self.ui_rev = UI_REV;
+            self.skin = "obsidian".into();
+            self.accent = "mono".into();
+        }
+        if !matches!(self.skin.as_str(), "obsidian" | "glass" | "minimal" | "neon" | "soft" | "classic") {
             self.skin = d.skin;
         }
         if !matches!(self.accent.as_str(), "blue" | "violet" | "pink" | "orange" | "green" | "mono") {

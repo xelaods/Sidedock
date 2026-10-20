@@ -66,6 +66,25 @@
     }
   }
 
+  /** パネルが開いたら、中身を上から順に、ぼけた状態から現す（data-sd-no-intro で止められる） */
+  function playIntro() {
+    if (slot !== "panel" || document.documentElement.hasAttribute("data-sd-no-intro") || !document.body) return;
+    const pick = (root) => [...root.children].filter((el) => !/^(SCRIPT|STYLE|TEMPLATE|LINK)$/.test(el.tagName) && !el.hidden);
+    let kids = pick(document.body);
+    if (kids.length === 1 && kids[0].children.length > 1) kids = pick(kids[0]);
+    kids.slice(0, 12).forEach((el, i) => {
+      el.classList.remove("sd-intro");
+      el.style.setProperty("--sd-i", String(i));
+      void el.offsetWidth;
+      el.classList.add("sd-intro");
+      el.addEventListener("animationend", function done(ev) {
+        if (ev.target !== el) return;
+        el.classList.remove("sd-intro");
+        el.removeEventListener("animationend", done);
+      });
+    });
+  }
+
   window.addEventListener("message", (e) => {
     if (e.source !== parent) return;
     const d = e.data;
@@ -78,7 +97,7 @@
     } else if (d.type === "event") {
       if (d.name === "init") context = d.data;
       if (d.name === "init" || d.name === "theme") applyTheme(d.data.dark, d.data.skin, d.data.accent);
-      if (d.name === "panelShown") panelOpen = true;
+      if (d.name === "panelShown") { panelOpen = true; playIntro(); }
       if (d.name === "init") setVisible(d.data.visible);
       if (d.name === "revealed") setVisible(true);
       if (d.name === "concealed") setVisible(false);

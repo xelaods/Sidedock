@@ -184,6 +184,8 @@ pub fn scan(app: &AppHandle) -> (HashMap<String, AddonInfo>, Vec<String>) {
 
 const SDK_JS: &[u8] = include_bytes!("../sdk/sidedock.js");
 const SDK_CSS: &[u8] = include_bytes!("../sdk/sidedock.css");
+/// 本体とアドオンで共通の欧文書体（Inter Tight、SIL Open Font License）
+const SDK_FONT: &[u8] = include_bytes!("../sdk/fonts/inter-tight.woff2");
 
 fn mime_of(path: &Path) -> &'static str {
     match path
@@ -255,6 +257,7 @@ pub fn handle_protocol(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<
                 None,
                 SDK_CSS.to_vec(),
             ),
+            "fonts/inter-tight.woff2" => respond(StatusCode::OK, "font/woff2", None, SDK_FONT.to_vec()),
             _ => not_found(),
         };
     }

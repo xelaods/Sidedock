@@ -7,17 +7,25 @@
 <style>
   /* 権限のいらない、いちばん小さなアドオンの例 */
   body { padding: 0 8px 0 10px; gap: 8px; border-radius: 16px; cursor: default; transition: background 0.2s; }
-  body:hover { background: var(--sd-hover); }
   body:active { background: var(--sd-press); }
   #date { font-size: 11.5px; color: var(--sd-ink-2); letter-spacing: 0.02em; }
   #time {
+    display: inline-flex; align-items: center;
     font: 600 14px/1 var(--sd-font-display);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
   }
+  /* 数字は 1 桁ずつ。変わった桁だけ、下から転がって入れ替わる */
+  .dg { position: relative; display: inline-block; height: 1.2em; overflow: hidden; }
+  .dg span { display: inline-block; line-height: 1.2em; }
+  .dg .out { position: absolute; left: 0; top: 0; animation: roll-out 0.5s cubic-bezier(0.65, 0, 0.076, 1) var(--d, 0s) both; }
+  .dg .in { animation: roll-in 0.62s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0s) both; }
+  @keyframes roll-out { to { transform: translateY(-110%); opacity: 0; filter: blur(2px); } }
+  @keyframes roll-in { from { transform: translateY(110%); opacity: 0; filter: blur(2px); } }
   /* 区切りのコロンがゆっくり明滅する */
   #time i { font-style: normal; display: inline-block; margin: 0 1px; animation: blink 2s ease-in-out infinite; }
   @keyframes blink { 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .dg .out { display: none; } .dg .in { animation: none; } }
 </style>
 </head>
 <body>
@@ -25,11 +33,53 @@
   <span id="time"></span>
 <script>
   const WEEK = "日月火水木金土";
+  const timeEl = document.getElementById("time");
+  let shown = "";
+
+  /** "16:41" のような文字を、変わった桁だけ転がして表示する */
+  function setTime(text) {
+    const prev = shown;
+    shown = text;
+    // 初めてや、桁数が変わったとき（9:59 → 10:00）は作り直す
+    if (prev.length !== text.length) {
+      timeEl.replaceChildren(...[...text].map((ch) => {
+        if (ch === ":") { const i = document.createElement("i"); i.textContent = ":"; return i; }
+        const d = document.createElement("span");
+        d.className = "dg";
+        const v = document.createElement("span");
+        if (prev) v.className = "in";
+        v.textContent = ch;
+        d.append(v);
+        return d;
+      }));
+      return;
+    }
+    let order = 0;
+    [...text].forEach((ch, i) => {
+      if (ch === ":" || ch === prev[i]) return;
+      const d = timeEl.children[i];
+      d.querySelectorAll(".out").forEach((n) => n.remove());
+      const old = d.querySelector("span");
+      // 変わった桁が左から順に、少しずつずれて転がる
+      const delay = `${order * 0.06}s`;
+      if (old) {
+        old.className = "out";
+        old.style.setProperty("--d", delay);
+        old.addEventListener("animationend", () => old.remove(), { once: true });
+      }
+      const n = document.createElement("span");
+      n.className = "in";
+      n.textContent = ch;
+      n.style.setProperty("--d", delay);
+      d.append(n);
+      order++;
+    });
+  }
+
   function tick() {
     const d = new Date();
     document.getElementById("date").textContent = `${d.getMonth() + 1}/${d.getDate()} ${WEEK[d.getDay()]}`;
-    document.getElementById("time").innerHTML =
-      `${d.getHours()}<i>:</i>${String(d.getMinutes()).padStart(2, "0")}`;
+    setTime(`${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`);
     document.body.dataset.hint = d.toLocaleDateString("ja-JP", { dateStyle: "full" });
     // 次の分の変わり目に合わせて更新
     setTimeout(tick, 60000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 50);

@@ -118,6 +118,7 @@ function trigger() {
 
 /** 見た目の種類。neon は暗い面が前提なので、いつもダーク */
 const SKINS = [
+  ["obsidian", "オブシディアン"],
   ["glass", "グラス"],
   ["minimal", "ミニマル"],
   ["neon", "ネオン"],
@@ -148,14 +149,14 @@ function accentColors() {
 }
 
 function themePayload() {
-  return { dark: state.dark, skin: state.config.skin || "glass", accent: accentColors() };
+  return { dark: state.dark, skin: state.config.skin || "obsidian", accent: accentColors() };
 }
 
 function applyTheme() {
   state.dark = computeDark();
   const root = document.documentElement;
   root.dataset.theme = state.dark ? "dark" : "light";
-  root.dataset.skin = state.config.skin || "glass";
+  root.dataset.skin = state.config.skin || "obsidian";
   root.style.colorScheme = state.config.skin === "classic" ? "" : state.dark ? "dark" : "light";
   const { accent, ink } = accentColors();
   const n = parseInt(accent.slice(1), 16);
@@ -529,11 +530,24 @@ function showHint(text, x) {
   if (hint.classList.contains("notice")) return;
   if (!text || state.active) return hideHint();
   const wasShown = hint.classList.contains("show");
-  hint.textContent = text;
+  reelText(hint, text);
   hint.style.setProperty("--hx", `${Math.round(x)}px`);
   hint.classList.toggle("moving", wasShown);
   hint.classList.add("show");
 }
+/** 文字を一つずつ、下からぼけた状態で現す（同じ文字なら何もしない） */
+function reelText(node, text) {
+  if (node.dataset.text === text) return;
+  node.dataset.text = text;
+  node.setAttribute("aria-label", text);
+  node.replaceChildren(...[...text].map((ch, i) => {
+    const r = el("span", { className: "r", textContent: ch });
+    r.setAttribute("aria-hidden", "true");
+    r.style.setProperty("--r", String(Math.min(i, 30)));
+    return r;
+  }));
+}
+
 function hideHint() {
   $("#hint").classList.remove("show", "moving", "notice");
 }
@@ -546,7 +560,7 @@ function notify(text, ms, frame) {
   const x = slot ? centerOf(slot) : (() => { const c = capsuleRect(); return c.x + c.w / 2; })();
   requestAnimationFrame(() => {
     const hint = $("#hint");
-    hint.textContent = text;
+    reelText(hint, text);
     hint.style.setProperty("--hx", `${Math.round(x)}px`);
     hint.classList.add("show", "notice");
   });
@@ -606,10 +620,25 @@ function itemAt(p) {
   return null;
 }
 
+/** 乗せた項目の後ろへ、面を滑らせる。初めて乗せたときは、その場でふわっと現す */
+function movePill(node) {
+  const pill = $("#pill");
+  if (!node) return pill.classList.remove("on");
+  const fresh = !pill.classList.contains("on");
+  pill.classList.toggle("snap", fresh);
+  pill.style.setProperty("--pl", `${node.offsetLeft}px`);
+  pill.style.setProperty("--pt", `${node.offsetTop}px`);
+  pill.style.setProperty("--pw2", `${node.offsetWidth}px`);
+  pill.style.setProperty("--ph2", `${node.offsetHeight}px`);
+  if (fresh) void pill.offsetWidth;
+  pill.classList.add("on");
+}
+
 function setHover(node) {
   if (node === state.hover) return;
   const prev = state.hover;
   state.hover = node;
+  movePill(node);
   if (prev) {
     prev.classList.remove("hover");
     if (prev.dataset.label) hideHint();
@@ -759,7 +788,15 @@ async function openPanel(id, { focus = false } = {}) {
   const wasOpen = state.active !== null;
   const prev = state.active;
   if (prev === id) return;
-  if (id === "settings") renderSettings();
+  if (id === "settings") {
+    renderSettings();
+    // 設定の中身も、上から順に現す
+    [...$("#settings-inner").children].slice(0, 14).forEach((n, i) => {
+      n.style.setProperty("--sd-i", String(i));
+      n.classList.add("sd-intro");
+      n.addEventListener("animationend", () => n.classList.remove("sd-intro"), { once: true });
+    });
+  }
   else {
     const addon = state.addons.get(id);
     if (!addon?.panel) return;
@@ -1222,7 +1259,7 @@ function renderSettings() {
   root.replaceChildren(...[
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.8.0" })),
+      el("span", { className: "s-ver", textContent: "0.9.0" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
     el("div", { className: "s-sec", textContent: "デザイン" }),
@@ -1274,7 +1311,7 @@ function renderDesign() {
     const b = el("button", { className: "skin-card", ariaLabel: `デザイン：${label}` },
       el("span", { className: `mini ${id}` }, el("i"), el("i"), el("i")),
       el("span", { textContent: label }));
-    b.setAttribute("aria-pressed", String((c.skin || "glass") === id));
+    b.setAttribute("aria-pressed", String((c.skin || "obsidian") === id));
     b.addEventListener("click", async () => {
       for (const x of cards) x.setAttribute("aria-pressed", String(x === b));
       await saveConfig({ skin: id });

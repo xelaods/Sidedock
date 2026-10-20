@@ -3,6 +3,14 @@
  * 色は CSS 変数（--sd-*）で参照してください。ライト/ダークは自動で切り替わります。
  * アドオンは本体のガラスの上に透けて重なるので、面の色は半透明になっています。
  */
+/* 欧文と数字の書体（Inter Tight、SIL Open Font License）。日本語は Windows の UI 書体になる */
+@font-face {
+  font-family: "SD Inter Tight";
+  src: url("fonts/inter-tight.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 :root {
   color-scheme: dark;
   --sd-ink: #f3f4f6;
@@ -233,3 +241,102 @@ html, body {
 }
 :root[data-skin="classic"] .sd-range:hover::-webkit-slider-thumb { transform: none; }
 :root[data-skin="classic"] .sd-bar-btn:hover { transform: none; background: transparent; box-shadow: inset -1px -1px 0 var(--sd-bv-dk), inset 1px 1px 0 var(--sd-bv-hi); }
+
+/* ================================================================ オブシディアン（既定のデザイン）
+   真っ黒な面・細い縁・白と灰色。ボタンは押す前から塗りが走り、主ボタンは白く浮き上がる */
+:root[data-skin="obsidian"] {
+  --sd-ink: #fafafa;
+  --sd-ink-2: rgba(250, 250, 250, 0.6);
+  --sd-ink-3: rgba(250, 250, 250, 0.36);
+  --sd-surface: rgba(255, 255, 255, 0.045);
+  --sd-surface-2: rgba(255, 255, 255, 0.025);
+  --sd-line: rgba(255, 255, 255, 0.085);
+  --sd-hover: rgba(255, 255, 255, 0.065);
+  --sd-press: rgba(255, 255, 255, 0.11);
+  --sd-danger: #ff8a80;
+  --sd-radius: 10px;
+  --sd-btn-radius: 12px;
+  --sd-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --sd-font: "SD Inter Tight", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+  --sd-font-display: "SD Inter Tight", "Yu Gothic UI", system-ui, sans-serif;
+}
+:root[data-skin="obsidian"][data-theme="light"] {
+  --sd-ink: #0a0a0a;
+  --sd-ink-2: rgba(10, 10, 10, 0.58);
+  --sd-ink-3: rgba(10, 10, 10, 0.36);
+  --sd-surface: rgba(0, 0, 0, 0.035);
+  --sd-surface-2: rgba(0, 0, 0, 0.02);
+  --sd-line: rgba(0, 0, 0, 0.085);
+  --sd-hover: rgba(0, 0, 0, 0.045);
+  --sd-press: rgba(0, 0, 0, 0.08);
+  --sd-danger: #d93025;
+}
+:root[data-skin="obsidian"] body { letter-spacing: 0.003em; }
+
+/* ボタン：カーソルを乗せると、左から塗りが走って満ちる */
+:root[data-skin="obsidian"] .sd-btn {
+  position: relative; isolation: isolate; overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--sd-line), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  transition: color 0.3s, box-shadow 0.3s, transform 0.2s var(--sd-ease);
+}
+:root[data-skin="obsidian"] .sd-btn::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  border-radius: inherit;
+  background: var(--sd-hover);
+  transform: scaleX(0); transform-origin: 0 50%;
+  transition: transform 0.48s cubic-bezier(0.65, 0, 0.076, 1);
+}
+:root[data-skin="obsidian"] .sd-btn:hover { background: var(--sd-surface); }
+:root[data-skin="obsidian"] .sd-btn:hover::before { transform: scaleX(1); }
+:root[data-skin="obsidian"] .sd-btn:active { transform: scale(0.96); background: var(--sd-surface); }
+:root[data-skin="obsidian"] .sd-btn.ghost { box-shadow: none; }
+:root[data-skin="obsidian"] .sd-btn.ghost:hover { background: transparent; }
+:root[data-skin="obsidian"] .sd-btn.primary {
+  background: var(--sd-accent); color: var(--sd-accent-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 20px -10px var(--sd-glow);
+}
+:root[data-skin="obsidian"] .sd-btn.primary::before { background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 60%); transform: none; opacity: 0.6; transition: opacity 0.3s; }
+:root[data-skin="obsidian"] .sd-btn.primary:hover { background: var(--sd-accent); filter: brightness(0.94); }
+:root[data-skin="obsidian"] .sd-btn.primary:hover::before { opacity: 1; }
+
+/* 入力欄：沈んだ黒。選ぶと縁が白く締まる */
+:root[data-skin="obsidian"] .sd-input,
+:root[data-skin="obsidian"] .sd-select {
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 0 0 1px var(--sd-line), inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+:root[data-skin="obsidian"][data-theme="light"] .sd-input,
+:root[data-skin="obsidian"][data-theme="light"] .sd-select { background: rgba(255, 255, 255, 0.7); box-shadow: inset 0 0 0 1px var(--sd-line); }
+:root[data-skin="obsidian"] .sd-input:focus,
+:root[data-skin="obsidian"] .sd-select:focus {
+  background: rgba(0, 0, 0, 0.36);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sd-ink) 38%, transparent), 0 0 0 4px color-mix(in srgb, var(--sd-ink) 7%, transparent);
+}
+:root[data-skin="obsidian"][data-theme="light"] .sd-input:focus { background: #fff; }
+:root[data-skin="obsidian"] .sd-select option { background: #0a0a0a; }
+:root[data-skin="obsidian"][data-theme="light"] .sd-select option { background: #fff; }
+
+/* スライダー：細い線と白い粒 */
+:root[data-skin="obsidian"] .sd-range::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--sd-accent) 0 var(--v), color-mix(in srgb, var(--sd-ink) 13%, transparent) var(--v) 100%);
+}
+:root[data-skin="obsidian"] .sd-range::-webkit-slider-thumb {
+  width: 13px; height: 13px; margin-top: -5px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 0 0 4px color-mix(in srgb, var(--sd-ink) 9%, transparent), 0 2px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+:root[data-skin="obsidian"] .sd-range:hover::-webkit-slider-thumb { transform: scale(1.25); }
+
+/* バーの中の唯一のボタンは、本体の滑る面に任せる（二重に光らないように） */
+:root[data-slot="bar"] body > .sd-bar-btn:only-of-type:hover { background: transparent; }
+
+/* ================================================================ パネルが開いたときの登場
+   SDK が中身の一つひとつに順番を振り、ぼけた状態から焦点が合うように下から現れる */
+.sd-intro { animation: sd-intro 0.56s cubic-bezier(0.22, 1, 0.36, 1) calc(90ms + var(--sd-i, 0) * 40ms) both; }
+@keyframes sd-intro {
+  from { opacity: 0; transform: translateY(10px); filter: blur(5px); }
+}
+:root[data-skin="classic"] .sd-intro { animation: none; }
+@media (prefers-reduced-motion: reduce) { .sd-intro { animation: none; } }
