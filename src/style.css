@@ -806,6 +806,82 @@ body[data-edge="bottom"] .view.active { transform: none; }
 :root[data-skin="easy"] .skin-card[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--sd-line-hover); background: var(--sd-surface); }
 :root[data-skin="easy"] .move .sd-btn { border-radius: 6px; box-shadow: none; background: transparent; }
 
+/* ---------------------------------------------------------------- EasyUI：easyui.site から測った値で仕上げる */
+:root[data-skin="easy"] {
+  --panel-radius: 26px;
+  --panel-bg: #18181b;
+  --panel-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.35);
+  --hint-bg: #18181b;
+  --outline: rgba(255, 255, 255, 0.08);
+  --material-bg: rgba(14, 14, 14, 0.9);
+  --chip-on-bg: #fafafa;
+  --chip-on-ink: #050505;
+}
+:root[data-skin="easy"][data-theme="light"] {
+  --panel-bg: #ffffff;
+  --panel-shadow: inset 0 0 0 1px #e4e4e7, 0 24px 48px -16px rgba(15, 15, 20, 0.16), 0 4px 12px rgba(15, 15, 20, 0.06);
+  --hint-bg: #ffffff;
+  --outline: #e4e4e7;
+  --chip-on-bg: #0a0a0a;
+  --chip-on-ink: #fafafa;
+}
+:root[data-skin="easy"] .icon-btn { width: 34px; height: 34px; }
+:root[data-skin="easy"] #capsule { height: 46px; padding: 0 6px; }
+:root[data-skin="easy"] #hint { top: 64px; border-radius: 10px; font: 500 11.5px/18px var(--sd-font); padding: 4px 10px; box-shadow: inset 0 0 0 1px var(--outline), 0 10px 24px rgba(0, 0, 0, 0.5); }
+:root[data-skin="easy"] body[data-edge="bottom"] #hint { bottom: 64px; }
+:root[data-skin="easy"] #hint.notice { background: #f2f2f3; color: #09090b; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45); }
+:root[data-skin="easy"][data-theme="light"] #hint.notice { background: #0a0a0a; color: #fafafa; }
+
+/* 設定：カード（#18181b）の中に、くぼみ（#0e0e0e）の段 */
+:root[data-skin="easy"] #settings-inner { padding: 18px 16px 16px; }
+:root[data-skin="easy"] .s-head { margin: 0 2px 4px; align-items: center; }
+:root[data-skin="easy"] .s-title { font: 600 17px/1.2 var(--sd-font-display); letter-spacing: -0.025em; }
+:root[data-skin="easy"] .s-ver { font: 500 11px/1 var(--sd-font); color: #a1a1a6; padding: 5px 9px; background: #1f1f22; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+:root[data-skin="easy"] .s-sec { margin: 18px 4px 8px; font: 500 11px/1 var(--sd-font); letter-spacing: 0.1em; color: #6f6f75; }
+:root[data-skin="easy"] .s-group { border-radius: 18px; background: #0e0e0e; box-shadow: inset 0 0 0 1px #1f1f1f; }
+:root[data-skin="easy"] .s-row { min-height: 44px; padding: 7px 10px 7px 14px; }
+:root[data-skin="easy"] .s-row + .s-row { box-shadow: inset 0 1px 0 #1a1a1a; }
+:root[data-skin="easy"] .s-label { font-size: 13px; font-weight: 500; color: #f2f2f3; }
+:root[data-skin="easy"] .s-sub { font-size: 11px; color: #6f6f75; }
+/* 選択肢：Preview / Usage / Code のタブと同じ。くぼみの上に、灰色の玉が滑る */
+:root[data-skin="easy"] .seg { padding: 3px; background: #0e0e0e; box-shadow: inset 0 0 0 1px #1f1f1f; }
+:root[data-skin="easy"] .seg-thumb { background: #1f1f22; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 3px rgba(0, 0, 0, 0.4); }
+:root[data-skin="easy"] .seg button { color: #8a8a90; font-weight: 500; line-height: 24px; }
+:root[data-skin="easy"] .seg button:hover { color: #d4d4d8; }
+:root[data-skin="easy"] .seg button[aria-pressed="true"] { color: #fafafa; font-weight: 500; }
+/* オン/オフ：Liquid Toggle。黒い溝の中を、つやのある白い玉が伸びながら滑る */
+:root[data-skin="easy"] .switch { width: 44px; height: 24px; }
+:root[data-skin="easy"] .switch span { background: #141414; box-shadow: inset 0 0 0 1px #1f1f1f; }
+:root[data-skin="easy"] .switch span::after {
+  top: 3px; left: 3px; width: 18px; height: 18px;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #c8c8c8 78%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  opacity: 0.5;
+  transition: transform 0.42s var(--spring-responsive), opacity 0.3s;
+}
+:root[data-skin="easy"] .switch input:checked + span { background: #141414; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+:root[data-skin="easy"] .switch input:checked + span::after { background: radial-gradient(circle at 35% 30%, #ffffff, #c8c8c8 78%); opacity: 1; transform: translateX(20px); }
+:root[data-skin="easy"] .switch input:checked:active + span::after { transform: translateX(20px); }
+:root[data-skin="easy"] .s-select { min-height: 32px; border-radius: 9999px; background: #1f1f22; padding: 0 12px; font-size: 12px; }
+:root[data-skin="easy"] .skin-card[aria-pressed="true"] { background: #1f1f22; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+
+/* ライト */
+:root[data-skin="easy"][data-theme="light"] .s-ver { background: #fff; color: #52525b; box-shadow: inset 0 0 0 1px #e4e4e7; }
+:root[data-skin="easy"][data-theme="light"] .s-group { background: #fafafa; box-shadow: inset 0 0 0 1px #e4e4e7; }
+:root[data-skin="easy"][data-theme="light"] .s-row + .s-row { box-shadow: inset 0 1px 0 #ededef; }
+:root[data-skin="easy"][data-theme="light"] .s-label { color: #0a0a0a; }
+:root[data-skin="easy"][data-theme="light"] .s-sub,
+:root[data-skin="easy"][data-theme="light"] .s-sec { color: #71717a; }
+:root[data-skin="easy"][data-theme="light"] .seg { background: #f4f4f5; box-shadow: inset 0 0 0 1px #e4e4e7; }
+:root[data-skin="easy"][data-theme="light"] .seg-thumb { background: #fff; box-shadow: 0 0 0 1px #e4e4e7, 0 1px 3px rgba(15, 15, 20, 0.1); }
+:root[data-skin="easy"][data-theme="light"] .seg button { color: #71717a; }
+:root[data-skin="easy"][data-theme="light"] .seg button[aria-pressed="true"] { color: #0a0a0a; }
+:root[data-skin="easy"][data-theme="light"] .switch span { background: #f4f4f5; box-shadow: inset 0 0 0 1px #e4e4e7; }
+:root[data-skin="easy"][data-theme="light"] .switch span::after,
+:root[data-skin="easy"][data-theme="light"] .switch input:checked + span::after { background: radial-gradient(circle at 35% 30%, #52525b, #0a0a0a 78%); box-shadow: 0 2px 5px rgba(15, 15, 20, 0.3); }
+:root[data-skin="easy"][data-theme="light"] .s-select { background: #fff; }
+:root[data-skin="easy"][data-theme="light"] .skin-card[aria-pressed="true"] { background: #fff; box-shadow: inset 0 0 0 1px #e4e4e7; }
+
 /* ---------------------------------------------------------------- オブシディアン（既定）
    黒曜石のような真っ黒な面に、髪の毛ほどの細い縁と上辺の光。色は白と灰色だけ。
    動きは、縁を一周する光・滑る面・塗りが走るボタンで見せる（ObsidianUI を参考） */

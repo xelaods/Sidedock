@@ -12,6 +12,13 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
+  font-family: "SD Inter";
+  src: url("fonts/inter.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
   font-family: "SD JetBrains Mono";
   src: url("fonts/jetbrains-mono.woff2") format("woff2");
   font-weight: 100 800;
@@ -469,4 +476,93 @@ html, body {
 /* パネルの中身の登場：ぼかさず、わずかに下から、柔らかいバネで */
 :root[data-skin="easy"] .sd-intro { animation: sd-intro-easy 0.73s var(--spring-gentle) calc(40ms + var(--sd-i, 0) * 30ms) both; }
 @keyframes sd-intro-easy { from { opacity: 0; transform: translateY(6px) scale(0.985); } }
+
+/* ---------------------------------------------------------------- EasyUI：easyui.site の実際の画面から測った値
+   面 #09090b / カード #18181b / くぼみ #0e0e0e / 縁は白の 8〜14%。
+   操作部品は Inter、見出しは Geist。ボタンも入力欄も丸いピル */
+:root[data-skin="easy"] {
+  --sd-ink: #f2f2f3;
+  --sd-ink-2: #a1a1a6;
+  --sd-ink-3: #6f6f75;
+  --sd-surface: #1c1c1f;
+  --sd-surface-2: #0e0e0e;
+  --sd-line: rgba(255, 255, 255, 0.08);
+  --sd-line-hover: rgba(255, 255, 255, 0.14);
+  --sd-hover: #202023;
+  --sd-press: #26262a;
+  --sd-chip: #141414;
+  --sd-radius: 14px;
+  --sd-font: "SD Inter", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+  --sd-font-display: "SD Geist", "SD Inter", "Yu Gothic UI", system-ui, sans-serif;
+}
+:root[data-skin="easy"][data-theme="light"] {
+  --sd-ink: #0a0a0a;
+  --sd-ink-2: #52525b;
+  --sd-ink-3: #71717a;
+  --sd-surface: #f4f4f5;
+  --sd-surface-2: #fafafa;
+  --sd-line: #e4e4e7;
+  --sd-line-hover: #d4d4d8;
+  --sd-hover: #f4f4f5;
+  --sd-press: #ececee;
+  --sd-chip: #f4f4f5;
+}
+:root[data-skin="easy"] body { letter-spacing: -0.011em; font-feature-settings: "cv11", "ss01"; }
+
+/* ボタン：丸いピル（EasyUI の Account や Copy CLI と同じ） */
+:root[data-skin="easy"] .sd-btn {
+  border-radius: 9999px;
+  min-height: 30px; padding: 0 14px;
+  background: #1f1f22;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  font-size: 12.5px; font-weight: 500;
+}
+:root[data-skin="easy"] .sd-btn:hover { background: #26262a; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+:root[data-skin="easy"] .sd-btn:active { background: #2a2a2e; }
+:root[data-skin="easy"][data-theme="light"] .sd-btn { background: #ffffff; box-shadow: inset 0 0 0 1px #e4e4e7, 0 1px 2px rgba(15, 15, 20, 0.05); }
+:root[data-skin="easy"][data-theme="light"] .sd-btn:hover { background: #f4f4f5; box-shadow: inset 0 0 0 1px #d4d4d8; }
+/* 主なボタン：白いピル（Browse components と同じ） */
+:root[data-skin="easy"] .sd-btn.primary { background: #f2f2f3; color: #09090b; box-shadow: none; font-weight: 500; }
+:root[data-skin="easy"] .sd-btn.primary:hover { background: #ffffff; }
+:root[data-skin="easy"][data-theme="light"] .sd-btn.primary { background: #0a0a0a; color: #fafafa; }
+:root[data-skin="easy"][data-theme="light"] .sd-btn.primary:hover { background: #27272a; }
+:root[data-skin="easy"] .sd-btn.ghost { background: transparent; box-shadow: none; }
+:root[data-skin="easy"] .sd-btn.ghost:hover { background: #202023; }
+:root[data-skin="easy"] .sd-btn.icon { width: 30px; padding: 0; }
+:root[data-skin="easy"][data-theme="light"] .sd-btn.ghost:hover { background: #f4f4f5; }
+
+/* 入力欄：#1c1c1f に白 10% の縁、角は 14px */
+:root[data-skin="easy"] .sd-input,
+:root[data-skin="easy"] .sd-select {
+  min-height: 36px;
+  border-radius: 14px;
+  background: #1c1c1f;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+}
+:root[data-skin="easy"] .sd-input::placeholder { color: #6f6f75; }
+:root[data-skin="easy"] .sd-input:hover,
+:root[data-skin="easy"] .sd-select:hover { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+:root[data-skin="easy"] .sd-input:focus,
+:root[data-skin="easy"] .sd-select:focus { background: #1c1c1f; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24), 0 0 0 3px rgba(255, 255, 255, 0.05); }
+:root[data-skin="easy"][data-theme="light"] .sd-input,
+:root[data-skin="easy"][data-theme="light"] .sd-select { background: #ffffff; box-shadow: inset 0 0 0 1px #e4e4e7; }
+:root[data-skin="easy"][data-theme="light"] .sd-input:focus,
+:root[data-skin="easy"][data-theme="light"] .sd-select:focus { background: #fff; box-shadow: inset 0 0 0 1px #a1a1aa, 0 0 0 3px rgba(10, 10, 10, 0.05); }
+:root[data-skin="easy"] .sd-select option { background: #18181b; }
+
+/* 小見出し：Inter の大文字、字間を広く（INTRO / GUIDES と同じ） */
+:root[data-skin="easy"] .sd-label { font: 500 11px/1.4 var(--sd-font); letter-spacing: 0.1em; text-transform: uppercase; color: #6f6f75; }
+
+/* スライダーの玉：つやのある白い玉（Liquid Toggle の玉と同じ塗り） */
+:root[data-skin="easy"] .sd-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--sd-accent) 0 var(--v), #26262a var(--v) 100%); }
+:root[data-skin="easy"][data-theme="light"] .sd-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--sd-accent) 0 var(--v), #e4e4e7 var(--v) 100%); }
+:root[data-skin="easy"] .sd-range::-webkit-slider-thumb { background: radial-gradient(circle at 35% 30%, #ffffff, #d4d4d4 75%); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.25); }
+:root[data-skin="easy"] .sd-bar-btn:hover { background: #141414; }
+:root[data-skin="easy"][data-theme="light"] .sd-bar-btn:hover { background: #f4f4f5; }
+
+:root[data-skin="easy"] .sd-input:focus-visible,
+:root[data-skin="easy"] .sd-select:focus-visible,
+:root[data-skin="easy"] textarea:focus-visible,
+:root[data-skin="easy"] input:focus-visible { outline: none; }
 @media (prefers-reduced-motion: reduce) { :root[data-skin] .sd-intro { animation: none; } }

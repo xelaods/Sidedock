@@ -53,7 +53,7 @@
 
 | デザイン | 見た目 |
 | --- | --- |
-| EasyUI | [EasyUI](https://easyui.site) の設計に合わせた見た目（既定）。ほぼ黒の丸いドックに丸いチップのアイコン、開いている項目は白く反転。動きはすべて EasyUI と同じバネの値（固さ・減衰・重さ）で動く |
+| EasyUI | [EasyUI](https://easyui.site) の設計に合わせた見た目（既定）。サイトの実際の画面から測った色（面 #09090b・カード #18181b・くぼみ #0e0e0e）と、Inter／Geist の文字。ほぼ黒の丸いドックに丸いチップのアイコン、開いている項目は白く反転。動きはすべて EasyUI と同じバネの値（固さ・減衰・重さ）で動く |
 | オブシディアン | 黒曜石のような真っ黒な面に細い縁。光の筋がシャッターのように開く映像的な動き（[ObsidianUI](https://obsidianui.dev) を参考） |
 | グラス | すりガラスの質感と光の演出 |
 | ミニマル | 光や質感のない、平らで静かな見た目。動きも控えめ |
@@ -65,7 +65,7 @@
 
 動きは、既定の EasyUI では EasyUI の motion-tokens と同じバネ（snappy・morph・gentle・responsive）を CSS に直して使っています。ドックは端の側から少し小さい状態でバネで現れ、アイコンは一つずつ粒から膨らみます。乗せたアイコンは浮いて大きくなり、後ろの面は形を変えながら追いかけます。パネルは開いた項目の方からバネで膨らみ、中身も順に現れます。オブシディアンでは、光の筋がシャッターのように開く映像的な動きになります（[モーションリファレンス](https://motion-reference.takayustudio.jp) を参考）。時計は、変わった桁だけが転がって入れ替わります。Windows の「アニメーション効果」をオフにしていると、これらの演出は省かれます。
 
-欧文と数字には Geist・JetBrains Mono・Inter Tight（どれも SIL Open Font License、`src-tauri/sdk/fonts/`）を同梱しています。
+欧文と数字には Inter・Geist・JetBrains Mono・Inter Tight（どれも SIL Open Font License、`src-tauri/sdk/fonts/`）を同梱しています。
 
 技術：Tauri 2（Rust）＋ HTML/CSS/JS。メモリが軽く、UI とアドオンは Web 技術で書けます。
 

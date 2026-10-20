@@ -186,6 +186,7 @@ const SDK_JS: &[u8] = include_bytes!("../sdk/sidedock.js");
 const SDK_CSS: &[u8] = include_bytes!("../sdk/sidedock.css");
 /// 本体とアドオンで共通の欧文書体（どれも SIL Open Font License）
 const SDK_FONTS: &[(&str, &[u8])] = &[
+    ("fonts/inter.woff2", include_bytes!("../sdk/fonts/inter.woff2")),
     ("fonts/geist.woff2", include_bytes!("../sdk/fonts/geist.woff2")),
     ("fonts/jetbrains-mono.woff2", include_bytes!("../sdk/fonts/jetbrains-mono.woff2")),
     ("fonts/inter-tight.woff2", include_bytes!("../sdk/fonts/inter-tight.woff2")),

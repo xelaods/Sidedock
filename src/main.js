@@ -1261,7 +1261,7 @@ function renderSettings() {
   root.replaceChildren(...[
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.10.0" })),
+      el("span", { className: "s-ver", textContent: "0.11.0" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
     el("div", { className: "s-sec", textContent: "デザイン" }),
