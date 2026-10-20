@@ -118,6 +118,7 @@ function trigger() {
 
 /** 見た目の種類。neon は暗い面が前提なので、いつもダーク */
 const SKINS = [
+  ["easy", "EasyUI"],
   ["obsidian", "オブシディアン"],
   ["glass", "グラス"],
   ["minimal", "ミニマル"],
@@ -132,7 +133,7 @@ const ACCENTS = {
   pink: ["#ff9ccf", "#2b0a1a", "#d63384", "#ffffff"],
   orange: ["#ffb36b", "#2a1404", "#d9661f", "#ffffff"],
   green: ["#7fe0a8", "#04200f", "#1f9d55", "#ffffff"],
-  mono: ["#e8eaed", "#111214", "#2b2d31", "#ffffff"],
+  mono: ["#fafafa", "#050505", "#0a0a0a", "#ffffff"],
 };
 const ACCENT_LABELS = { blue: "青", violet: "紫", pink: "ピンク", orange: "オレンジ", green: "緑", mono: "モノクロ" };
 
@@ -149,14 +150,14 @@ function accentColors() {
 }
 
 function themePayload() {
-  return { dark: state.dark, skin: state.config.skin || "obsidian", accent: accentColors() };
+  return { dark: state.dark, skin: state.config.skin || "easy", accent: accentColors() };
 }
 
 function applyTheme() {
   state.dark = computeDark();
   const root = document.documentElement;
   root.dataset.theme = state.dark ? "dark" : "light";
-  root.dataset.skin = state.config.skin || "obsidian";
+  root.dataset.skin = state.config.skin || "easy";
   root.style.colorScheme = state.config.skin === "classic" ? "" : state.dark ? "dark" : "light";
   const { accent, ink } = accentColors();
   const n = parseInt(accent.slice(1), 16);
@@ -639,6 +640,7 @@ function setHover(node) {
   const prev = state.hover;
   state.hover = node;
   movePill(node);
+  document.body.classList.toggle("engaged", !!node);
   if (prev) {
     prev.classList.remove("hover");
     if (prev.dataset.label) hideHint();
@@ -1259,7 +1261,7 @@ function renderSettings() {
   root.replaceChildren(...[
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.9.0" })),
+      el("span", { className: "s-ver", textContent: "0.10.0" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
     el("div", { className: "s-sec", textContent: "デザイン" }),
@@ -1311,7 +1313,7 @@ function renderDesign() {
     const b = el("button", { className: "skin-card", ariaLabel: `デザイン：${label}` },
       el("span", { className: `mini ${id}` }, el("i"), el("i"), el("i")),
       el("span", { textContent: label }));
-    b.setAttribute("aria-pressed", String((c.skin || "obsidian") === id));
+    b.setAttribute("aria-pressed", String((c.skin || "easy") === id));
     b.addEventListener("click", async () => {
       for (const x of cards) x.setAttribute("aria-pressed", String(x === b));
       await saveConfig({ skin: id });

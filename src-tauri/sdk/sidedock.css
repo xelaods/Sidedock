@@ -3,7 +3,21 @@
  * 色は CSS 変数（--sd-*）で参照してください。ライト/ダークは自動で切り替わります。
  * アドオンは本体のガラスの上に透けて重なるので、面の色は半透明になっています。
  */
-/* 欧文と数字の書体（Inter Tight、SIL Open Font License）。日本語は Windows の UI 書体になる */
+/* 欧文と数字の書体（どれも SIL Open Font License）。日本語は Windows の UI 書体になる */
+@font-face {
+  font-family: "SD Geist";
+  src: url("fonts/geist.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "SD JetBrains Mono";
+  src: url("fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 100 800;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 @font-face {
   font-family: "SD Inter Tight";
   src: url("fonts/inter-tight.woff2") format("woff2");
@@ -30,6 +44,7 @@
   --sd-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --sd-font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
   --sd-font-display: "Segoe UI Variable Display", "Segoe UI", "Yu Gothic UI", system-ui, sans-serif;
+  --sd-font-mono: "Cascadia Mono", Consolas, "Yu Gothic UI", monospace;
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -340,3 +355,118 @@ html, body {
 }
 :root[data-skin="classic"] .sd-intro { animation: none; }
 @media (prefers-reduced-motion: reduce) { .sd-intro { animation: none; } }
+
+/* ================================================================ EasyUI（既定のデザイン）
+   easyui.site の設計に合わせる：ほぼ黒の面・#1F1F1F の細い縁・白黒だけ・丸いチップ。
+   動きは時間ではなくバネ（固さ・減衰・重さ）で決める。値は EasyUI の motion-tokens から */
+:root {
+  /* バネを CSS の linear() に直したもの（右はおよその落ち着くまでの時間） */
+  --spring-snappy: linear(0, 0.049, 0.146, 0.26, 0.373, 0.476, 0.566, 0.644, 0.709, 0.763, 0.808, 0.844, 0.874, 0.898, 0.918, 0.933, 0.946, 0.957, 0.965, 0.972, 0.977, 0.982, 0.985, 0.988, 0.99, 0.992, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 0.999, 1); /* 410ms */
+  --spring-morph: linear(0, 0.04, 0.128, 0.234, 0.342, 0.443, 0.534, 0.613, 0.68, 0.737, 0.784, 0.823, 0.856, 0.882, 0.904, 0.922, 0.937, 0.948, 0.958, 0.966, 0.972, 0.978, 0.982, 0.985, 0.988, 0.99, 0.992, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 1); /* 710ms */
+  --spring-responsive: linear(0, 0.032, 0.11, 0.211, 0.323, 0.431, 0.537, 0.633, 0.716, 0.784, 0.843, 0.89, 0.927, 0.955, 0.976, 0.991, 1.001, 1.008, 1.012, 1.014, 1.014, 1.013, 1.012, 1.011, 1.009, 1.008, 1.006, 1.005, 1.004, 1.003, 1.002, 1.002, 1.001, 1.001, 1); /* 420ms、わずかに行き過ぎる */
+  --spring-gentle: linear(0, 0.037, 0.119, 0.22, 0.325, 0.424, 0.515, 0.595, 0.664, 0.722, 0.771, 0.813, 0.847, 0.875, 0.899, 0.918, 0.933, 0.945, 0.956, 0.964, 0.971, 0.977, 0.981, 0.985, 0.988, 0.99, 0.992, 0.993, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 1); /* 730ms */
+  --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-fast: cubic-bezier(0.2, 0, 0, 1);
+}
+:root[data-skin="easy"] {
+  --sd-ink: #fafafa;
+  --sd-ink-2: #a1a1a1;
+  --sd-ink-3: #6b6b6b;
+  --sd-surface: #141414;
+  --sd-surface-2: #0a0a0a;
+  --sd-line: #1f1f1f;
+  --sd-line-hover: #2a2a2a;
+  --sd-hover: #141414;
+  --sd-press: #1a1a1a;
+  --sd-chip: #141414;
+  --sd-danger: #f87171;
+  --sd-focus: rgba(56, 189, 248, 0.5);
+  --sd-radius: 10px;
+  --sd-btn-radius: 9999px;
+  --sd-ease: var(--ease-soft);
+  --sd-font: "SD Geist", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+  --sd-font-display: "SD Geist", "Yu Gothic UI", system-ui, sans-serif;
+  --sd-font-mono: "SD JetBrains Mono", "Yu Gothic UI", Consolas, monospace;
+}
+:root[data-skin="easy"][data-theme="light"] {
+  --sd-ink: #0a0a0a;
+  --sd-ink-2: #52525b;
+  --sd-ink-3: #71717a;
+  --sd-surface: #f4f4f5;
+  --sd-surface-2: #fafafa;
+  --sd-line: #e4e4e7;
+  --sd-line-hover: #d4d4d8;
+  --sd-hover: #f4f4f5;
+  --sd-press: #ececee;
+  --sd-chip: #f4f4f5;
+  --sd-danger: #dc2626;
+}
+:root[data-skin="easy"] body { letter-spacing: -0.011em; }
+:root[data-skin="easy"] :focus-visible { outline: 2px solid var(--sd-focus); outline-offset: 2px; }
+
+/* ボタン：細い縁の黒い面。押すとバネで縮む */
+:root[data-skin="easy"] .sd-btn {
+  border-radius: var(--sd-radius);
+  background: var(--sd-surface-2);
+  box-shadow: inset 0 0 0 1px var(--sd-line);
+  color: var(--sd-ink);
+  font-weight: 500;
+  transition: background 0.2s, box-shadow 0.2s, color 0.2s, transform 0.41s var(--spring-snappy);
+}
+:root[data-skin="easy"] .sd-btn:hover { background: var(--sd-press); box-shadow: inset 0 0 0 1px var(--sd-line-hover); }
+:root[data-skin="easy"] .sd-btn:active { background: var(--sd-press); transform: scale(0.96); transition-duration: 0.2s, 0.2s, 0.2s, 0.12s; }
+:root[data-skin="easy"] .sd-btn.primary {
+  background: var(--sd-accent); color: var(--sd-accent-ink); font-weight: 600;
+  box-shadow: 0 0 20px -3px color-mix(in srgb, var(--sd-accent) 18%, transparent);
+}
+:root[data-skin="easy"] .sd-btn.primary:hover { background: color-mix(in srgb, var(--sd-accent) 86%, white); }
+:root[data-skin="easy"] .sd-btn.ghost { background: transparent; box-shadow: none; color: var(--sd-ink-2); }
+:root[data-skin="easy"] .sd-btn.ghost:hover { background: var(--sd-hover); color: var(--sd-ink); }
+:root[data-skin="easy"] .sd-btn.icon { border-radius: 9999px; }
+
+/* 入力欄：沈んだ黒と細い縁。選ぶと縁が明るくなる */
+:root[data-skin="easy"] .sd-input,
+:root[data-skin="easy"] .sd-select {
+  border-radius: var(--sd-radius);
+  background: var(--sd-surface-2);
+  box-shadow: inset 0 0 0 1px var(--sd-line);
+  transition: box-shadow 0.2s, background 0.2s;
+}
+:root[data-skin="easy"] .sd-input::placeholder { color: #737373; }
+:root[data-skin="easy"] .sd-input:hover,
+:root[data-skin="easy"] .sd-select:hover { box-shadow: inset 0 0 0 1px var(--sd-line-hover); }
+:root[data-skin="easy"] .sd-input:focus,
+:root[data-skin="easy"] .sd-select:focus { background: var(--sd-surface-2); box-shadow: inset 0 0 0 1px #3a3a3a, 0 0 0 3px rgba(255, 255, 255, 0.04); }
+:root[data-skin="easy"][data-theme="light"] .sd-input:focus,
+:root[data-skin="easy"][data-theme="light"] .sd-select:focus { background: #fff; box-shadow: inset 0 0 0 1px #a1a1aa, 0 0 0 3px rgba(10, 10, 10, 0.05); }
+:root[data-skin="easy"] .sd-select option { background: #0e0e0e; }
+:root[data-skin="easy"][data-theme="light"] .sd-select option { background: #fff; }
+
+/* 見出しは小さな等幅の大文字（EasyUI の eyebrow） */
+:root[data-skin="easy"] .sd-label { font: 500 10.5px/1.4 var(--sd-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: #737373; }
+
+/* スライダー：細い線に白い粒。触るとバネで膨らむ */
+:root[data-skin="easy"] .sd-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--sd-accent) 0 var(--v), var(--sd-line) var(--v) 100%);
+}
+:root[data-skin="easy"] .sd-range::-webkit-slider-thumb {
+  width: 14px; height: 14px; margin-top: -5px;
+  background: #fafafa;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 0.42s var(--spring-responsive);
+}
+:root[data-skin="easy"][data-theme="light"] .sd-range::-webkit-slider-thumb { background: #fff; box-shadow: 0 0 0 1px #d4d4d8, 0 2px 6px rgba(15, 15, 20, 0.15); }
+:root[data-skin="easy"] .sd-range:hover::-webkit-slider-thumb { transform: scale(1.18); }
+:root[data-skin="easy"] .sd-range:active::-webkit-slider-thumb { transform: scale(1.05); }
+
+/* バーのボタン：丸いチップ */
+:root[data-skin="easy"] .sd-bar-btn { border-radius: 9999px; transition: background 0.2s, color 0.2s, transform 0.42s var(--spring-responsive); }
+:root[data-skin="easy"] .sd-bar-btn:hover { background: var(--sd-chip); transform: scale(1.06); }
+:root[data-skin="easy"] .sd-bar-btn:active { transform: scale(0.95); transition-duration: 0.2s, 0.2s, 0.12s; }
+:root[data-skin="easy"] .sd-empty { color: #737373; font-size: 12px; }
+
+/* パネルの中身の登場：ぼかさず、わずかに下から、柔らかいバネで */
+:root[data-skin="easy"] .sd-intro { animation: sd-intro-easy 0.73s var(--spring-gentle) calc(40ms + var(--sd-i, 0) * 30ms) both; }
+@keyframes sd-intro-easy { from { opacity: 0; transform: translateY(6px) scale(0.985); } }
+@media (prefers-reduced-motion: reduce) { :root[data-skin] .sd-intro { animation: none; } }

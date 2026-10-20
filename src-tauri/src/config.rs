@@ -11,8 +11,8 @@ pub struct AddonEntry {
     pub enabled: bool,
 }
 
-/// 見た目の改訂の番号（0.9.0 のオブシディアンが 1）
-const UI_REV: u32 = 1;
+/// 見た目の改訂の番号（0.9.0 のオブシディアンが 1、0.10.0 の EasyUI が 2）
+const UI_REV: u32 = 2;
 
 /// 画面の端でのジェスチャーと、それぞれに割り当てた操作
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -77,7 +77,7 @@ pub struct Config {
     pub show: String,
     /// Windows のタスクバーを隠して、SideDock を代わりに使う
     pub hide_taskbar: bool,
-    /// 見た目："obsidian" | "glass" | "minimal" | "neon" | "soft" | "classic"
+    /// 見た目："easy" | "obsidian" | "glass" | "minimal" | "neon" | "soft" | "classic"
     pub skin: String,
     /// アクセントカラー："blue" | "violet" | "pink" | "orange" | "green" | "mono"
     pub accent: String,
@@ -99,7 +99,7 @@ impl Default for Config {
             theme: "dark".into(),
             show: "hover".into(),
             hide_taskbar: false,
-            skin: "obsidian".into(),
+            skin: "easy".into(),
             accent: "mono".into(),
             ui_rev: UI_REV,
             gestures: Gestures::default(),
@@ -127,13 +127,13 @@ impl Config {
         if !matches!(self.show.as_str(), "hover" | "always") {
             self.show = d.show;
         }
-        // 0.9.0 で見た目を刷新した。それより前の設定は、一度だけ新しい既定のデザインへ切り替える
+        // 見た目を刷新したら、それより前の設定は一度だけ新しい既定のデザインへ切り替える
         if self.ui_rev < UI_REV {
             self.ui_rev = UI_REV;
-            self.skin = "obsidian".into();
+            self.skin = "easy".into();
             self.accent = "mono".into();
         }
-        if !matches!(self.skin.as_str(), "obsidian" | "glass" | "minimal" | "neon" | "soft" | "classic") {
+        if !matches!(self.skin.as_str(), "easy" | "obsidian" | "glass" | "minimal" | "neon" | "soft" | "classic") {
             self.skin = d.skin;
         }
         if !matches!(self.accent.as_str(), "blue" | "violet" | "pink" | "orange" | "green" | "mono") {

@@ -184,8 +184,12 @@ pub fn scan(app: &AppHandle) -> (HashMap<String, AddonInfo>, Vec<String>) {
 
 const SDK_JS: &[u8] = include_bytes!("../sdk/sidedock.js");
 const SDK_CSS: &[u8] = include_bytes!("../sdk/sidedock.css");
-/// 本体とアドオンで共通の欧文書体（Inter Tight、SIL Open Font License）
-const SDK_FONT: &[u8] = include_bytes!("../sdk/fonts/inter-tight.woff2");
+/// 本体とアドオンで共通の欧文書体（どれも SIL Open Font License）
+const SDK_FONTS: &[(&str, &[u8])] = &[
+    ("fonts/geist.woff2", include_bytes!("../sdk/fonts/geist.woff2")),
+    ("fonts/jetbrains-mono.woff2", include_bytes!("../sdk/fonts/jetbrains-mono.woff2")),
+    ("fonts/inter-tight.woff2", include_bytes!("../sdk/fonts/inter-tight.woff2")),
+];
 
 fn mime_of(path: &Path) -> &'static str {
     match path
@@ -257,8 +261,10 @@ pub fn handle_protocol(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<
                 None,
                 SDK_CSS.to_vec(),
             ),
-            "fonts/inter-tight.woff2" => respond(StatusCode::OK, "font/woff2", None, SDK_FONT.to_vec()),
-            _ => not_found(),
+            other => match SDK_FONTS.iter().find(|(name, _)| *name == other) {
+                Some((_, data)) => respond(StatusCode::OK, "font/woff2", None, data.to_vec()),
+                None => not_found(),
+            },
         };
     }
 

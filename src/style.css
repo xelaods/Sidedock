@@ -562,6 +562,250 @@ body[data-edge="bottom"] .view.active { transform: none; }
    設定の「デザイン」で切り替える。:root[data-skin="…"] で、素材・形・動きを上書きする。
    既定の「グラス」は上で定義したもの */
 
+/* ---------------------------------------------------------------- EasyUI（既定）
+   easyui.site の設計に合わせる。ほぼ黒の丸いドックに、丸いチップのアイコン。
+   開いている項目のチップは白く反転する。動きはすべてバネ（sidedock.css の --spring-*） */
+:root[data-skin="easy"] {
+  --cap-radius: 9999px;
+  --panel-radius: 20px;
+  --btn-radius: 9999px;
+  --grain-opacity: 0;
+  --material-bg: rgba(14, 14, 14, 0.94);
+  --material-shadow: inset 0 0 0 1px #1f1f1f, 0 12px 40px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --panel-bg: rgba(14, 14, 14, 0.97);
+  --panel-shadow: inset 0 0 0 1px #1f1f1f, 0 24px 60px rgba(0, 0, 0, 0.9);
+  --spot: transparent;
+  --hint-bg: #0e0e0e;
+  --divider: #1f1f1f;
+  --outline: #1f1f1f;
+  --pill-bg: #141414;
+  --pill-shadow: inset 0 0 0 1px #1f1f1f;
+  --chip-bg: #141414;
+  --chip-line: #1f1f1f;
+  --chip-ink: #a1a1a1;
+  --chip-hover-bg: #0e0e0e;
+  --chip-on-bg: #fafafa;
+  --chip-on-ink: #050505;
+  --cap-line-hover: #2a2a2a;
+}
+:root[data-skin="easy"][data-theme="light"] {
+  --material-bg: rgba(255, 255, 255, 0.92);
+  --material-shadow: inset 0 0 0 1px #e4e4e7, 0 12px 28px -8px rgba(15, 15, 20, 0.18), 0 0 0 1px rgba(15, 15, 20, 0.04);
+  --panel-bg: rgba(255, 255, 255, 0.98);
+  --panel-shadow: inset 0 0 0 1px #e4e4e7, 0 10px 25px -8px rgba(15, 15, 20, 0.12), 0 24px 48px -16px rgba(15, 15, 20, 0.14);
+  --hint-bg: #ffffff;
+  --divider: #e4e4e7;
+  --outline: #e4e4e7;
+  --pill-bg: #f4f4f5;
+  --pill-shadow: inset 0 0 0 1px #e4e4e7;
+  --chip-bg: #f4f4f5;
+  --chip-line: #e4e4e7;
+  --chip-ink: #52525b;
+  --chip-hover-bg: #ececee;
+  --chip-on-bg: #0a0a0a;
+  --chip-on-ink: #ffffff;
+  --cap-line-hover: #d4d4d8;
+}
+:root[data-skin="easy"] body { font-family: var(--sd-font); }
+:root[data-skin="easy"] #panel-glass { background: var(--panel-bg); box-shadow: var(--panel-shadow); }
+
+/* ドック：丸い棒。カーソルが乗っている間は縁が少し明るくなる */
+:root[data-skin="easy"] #capsule { height: 44px; padding: 0 6px; gap: 6px; transition: visibility 0s linear 0.24s, box-shadow 0.3s; }
+:root[data-skin="easy"] #items { gap: 6px; }
+:root[data-skin="easy"] body.engaged #capsule { --material-shadow: inset 0 0 0 1px var(--cap-line-hover), 0 14px 44px rgba(0, 0, 0, 0.66), 0 2px 6px rgba(0, 0, 0, 0.4); }
+:root[data-skin="easy"][data-theme="light"] body.engaged #capsule { --material-shadow: inset 0 0 0 1px var(--cap-line-hover), 0 14px 32px -8px rgba(15, 15, 20, 0.22); }
+
+/* 出てくるとき：端の側から、少し小さい状態でバネで現れる（EasyUI の Floating Dock と同じ値） */
+:root[data-skin="easy"] #capsule {
+  clip-path: none;
+  animation: easy-dock-out 0.22s var(--ease-fast) both;
+}
+:root[data-skin="easy"] .is-shown #capsule {
+  clip-path: none;
+  animation: easy-dock-in 0.68s var(--spring-gentle) both;
+  /* 出るときは、すぐ見えるようにする（隠れるときだけ描画を止めるのを遅らせる） */
+  transition: box-shadow 0.3s;
+}
+@keyframes easy-dock-in {
+  from { opacity: 0; transform: translateY(calc(var(--dir) * 20px)) scale(0.92); }
+  40% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+@keyframes easy-dock-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(calc(var(--dir) * 14px)) scale(0.94); }
+}
+:root[data-skin="easy"] #capsule::after,
+:root[data-skin="easy"] #sweep,
+:root[data-skin="easy"] #spot { display: none; }
+
+/* 中身：一つずつ、小さな粒からバネで膨らむ */
+:root[data-skin="easy"] .item {
+  opacity: 0;
+  transform: translateY(calc(var(--dir) * 6px)) scale(0.6);
+  filter: none;
+  transition: opacity 0.12s, transform 0.16s var(--ease-fast);
+}
+:root[data-skin="easy"] .is-shown .item {
+  --d: calc(70ms + var(--i, 0) * 28ms);
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.24s var(--ease-soft) var(--d),
+    transform 0.42s var(--spring-responsive) var(--d),
+    background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+:root[data-skin="easy"] .is-shown.settled .item { --d: 0s; }
+
+/* アイコンは丸いチップ。乗せると端から離れる向きに少し浮いて大きくなる */
+:root[data-skin="easy"] .icon-btn {
+  width: 32px; height: 32px;
+  border-radius: 9999px;
+  background: var(--chip-bg);
+  box-shadow: inset 0 0 0 1px var(--chip-line);
+  color: var(--chip-ink);
+}
+:root[data-skin="easy"] .is-shown.settled .icon-btn {
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.41s var(--spring-snappy);
+}
+:root[data-skin="easy"] .is-shown.settled .icon-btn.hover {
+  background: var(--chip-hover-bg);
+  color: var(--sd-ink);
+  transform: translateY(calc(var(--dir) * 2px)) scale(1.12);
+}
+:root[data-skin="easy"] .is-shown.settled .icon-btn.hover:active { transform: scale(0.95); transition-duration: 0.12s; }
+/* 開いている項目：白く反転したチップ */
+:root[data-skin="easy"] .icon-btn.active,
+:root[data-skin="easy"] .is-shown.settled .icon-btn.active.hover {
+  background: var(--chip-on-bg);
+  color: var(--chip-on-ink);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+:root[data-skin="easy"] .icon-btn::after,
+:root[data-skin="easy"] .icon-btn::before { display: none; }
+/* 横長のウィジェットは、開いている間、下に白い短い線 */
+:root[data-skin="easy"] .bar-slot::after {
+  width: 14px; height: 2px; margin-left: -7px; bottom: -4px;
+  border-radius: 1px;
+  background: var(--sd-ink);
+  box-shadow: none;
+  transform: scaleX(0);
+  transition: transform 0.41s var(--spring-snappy);
+}
+:root[data-skin="easy"] .bar-slot.active::after { transform: scaleX(1); }
+:root[data-skin="easy"] .bar-slot::before { display: none; }
+:root[data-skin="easy"] body[data-edge="bottom"] .bar-slot::after { bottom: auto; top: -4px; }
+:root[data-skin="easy"] .divider { height: 18px; margin: 0 1px; background: var(--divider); }
+
+/* 乗せた項目の後ろの面：形を変えながらバネで追いかける（EasyUI の layoutId と同じ springMorph） */
+:root[data-skin="easy"] #pill.on {
+  transition: opacity 0.2s, transform 0.42s var(--spring-responsive), left 0.71s var(--spring-morph), width 0.71s var(--spring-morph), top 0.71s var(--spring-morph), height 0.71s var(--spring-morph);
+}
+
+/* パネル：角の丸い黒い板。開いた項目の方から、バネで膨らむ（OriginDropdown） */
+:root[data-skin="easy"] #panel {
+  clip-path: none;
+  transform-origin: var(--ox, 50%) 0;
+  transform: translateY(calc(var(--dir) * 8px)) scale(0.96);
+  transition:
+    opacity 0.16s var(--ease-fast),
+    transform 0.2s var(--ease-fast),
+    visibility 0s linear 0.2s;
+}
+:root[data-skin="easy"] #panel.open {
+  clip-path: none;
+  transform: none;
+  transition:
+    opacity 0.2s var(--ease-soft),
+    transform 0.41s var(--spring-snappy),
+    left 0.71s var(--spring-morph),
+    top 0.71s var(--spring-morph),
+    width 0.71s var(--spring-morph),
+    height 0.71s var(--spring-morph);
+}
+:root[data-skin="easy"] body[data-edge="bottom"] #panel { transform-origin: var(--ox, 50%) 100%; }
+:root[data-skin="easy"] .view { filter: none; transform: translateY(6px); }
+:root[data-skin="easy"] .view.active { transform: none; transition: opacity 0.3s var(--ease-soft) 0.06s, transform 0.73s var(--spring-gentle) 0.06s; }
+
+/* 説明：小さな黒い札が、ドックの方からバネで出る（DirectionalTooltip） */
+:root[data-skin="easy"] #hint { top: 62px; }
+:root[data-skin="easy"] body[data-edge="bottom"] #hint { top: auto; bottom: 62px; }
+:root[data-skin="easy"] #hint {
+  border-radius: 8px;
+  padding: 4px 9px;
+  font: 500 11px/18px var(--sd-font);
+  box-shadow: inset 0 0 0 1px var(--outline), 0 8px 20px rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, calc(var(--dir) * 4px)) scale(0.96);
+  transition: opacity 0.12s, transform 0.2s var(--ease-fast);
+}
+:root[data-skin="easy"] #hint.show {
+  transform: translate(-50%, 0) scale(1);
+  transition: opacity 0.2s var(--ease-soft) 0.1s, transform 0.41s var(--spring-snappy) 0.1s, left 0.71s var(--spring-morph);
+}
+:root[data-skin="easy"] #hint.show.moving { transition-delay: 0s; }
+:root[data-skin="easy"] #hint .r { animation: none; }
+:root[data-skin="easy"] #hint.notice {
+  border-radius: 9999px;
+  padding: 5px 12px;
+  background: var(--chip-on-bg);
+  color: var(--chip-on-ink);
+  font-weight: 600;
+  box-shadow: 0 0 20px -3px rgba(255, 255, 255, 0.15), 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* 隠れている間の印：細い丸い棒。近づくほど伸びて明るくなる */
+:root[data-skin="easy"] #handle {
+  height: 4px;
+  border-radius: 9999px;
+  background: #0e0e0e;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, calc(0.12 + var(--prox) * 0.3)), 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: width 0.41s var(--spring-snappy), margin-left 0.41s var(--spring-snappy), opacity 0.3s, box-shadow 0.3s, transform 0.41s var(--spring-snappy);
+}
+:root[data-skin="easy"][data-theme="light"] #handle { background: #fff; box-shadow: inset 0 0 0 1px rgba(10, 10, 10, calc(0.14 + var(--prox) * 0.25)), 0 2px 6px rgba(15, 15, 20, 0.12); }
+
+/* 設定：EasyUI のカードと、白い玉が滑る切り替え */
+:root[data-skin="easy"] #settings-inner { padding: 16px 14px 14px; }
+:root[data-skin="easy"] .s-title { font: 600 15px/1.2 var(--sd-font-display); letter-spacing: -0.02em; }
+:root[data-skin="easy"] .s-ver { font: 400 10.5px/1 var(--sd-font-mono); color: #737373; padding: 3px 7px; border-radius: 9999px; box-shadow: inset 0 0 0 1px var(--sd-line); }
+:root[data-skin="easy"] .s-sec { margin: 16px 2px 7px; font: 500 10.5px/1 var(--sd-font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: #737373; }
+:root[data-skin="easy"] .s-group { border-radius: 14px; background: var(--sd-surface-2); box-shadow: inset 0 0 0 1px var(--sd-line); }
+:root[data-skin="easy"] .s-row + .s-row { box-shadow: inset 0 1px 0 var(--sd-line); }
+:root[data-skin="easy"] .s-label { font-weight: 500; }
+:root[data-skin="easy"] .s-sub { color: #737373; }
+:root[data-skin="easy"] .seg { padding: 3px; border-radius: 9999px; background: #050505; box-shadow: inset 0 0 0 1px var(--sd-line); }
+:root[data-skin="easy"][data-theme="light"] .seg { background: #f4f4f5; }
+:root[data-skin="easy"] .seg-thumb {
+  top: 3px; bottom: 3px;
+  border-radius: 9999px;
+  background: var(--chip-on-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: left 0.71s var(--spring-morph), width 0.71s var(--spring-morph);
+}
+:root[data-skin="easy"] .seg button { border-radius: 9999px; padding: 0 10px; font-weight: 500; color: var(--sd-ink-2); transition: color 0.25s; }
+:root[data-skin="easy"] .seg button[aria-pressed="true"] { color: var(--chip-on-ink); font-weight: 600; }
+/* オン/オフ：中の玉が、伸びながら滑る（LiquidToggle） */
+:root[data-skin="easy"] .switch { width: 38px; height: 22px; }
+:root[data-skin="easy"] .switch span { border-radius: 9999px; background: var(--chip-bg); box-shadow: inset 0 0 0 1px var(--chip-line); }
+:root[data-skin="easy"] .switch span::after {
+  top: 3px; left: 3px; width: 16px; height: 16px;
+  background: #5a5a5a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 0.42s var(--spring-responsive), background 0.25s;
+  animation: blob-a 0.42s var(--ease-soft);
+}
+:root[data-skin="easy"] .switch input:checked + span { background: var(--chip-bg); box-shadow: inset 0 0 0 1px var(--sd-line-hover), 0 0 14px -6px rgba(255, 255, 255, 0.25); }
+:root[data-skin="easy"] .switch input:checked + span::after { background: var(--chip-on-bg); transform: translateX(16px); animation: blob-b 0.42s var(--ease-soft); }
+:root[data-skin="easy"] .switch input:active + span::after { width: 16px; }
+:root[data-skin="easy"] .switch input:checked:active + span::after { transform: translateX(16px); }
+@keyframes blob-a { 40% { scale: 1.35 0.82; } }
+@keyframes blob-b { 40% { scale: 1.35 0.82; } }
+:root[data-skin="easy"][data-theme="light"] .switch span::after { background: #a1a1aa; }
+:root[data-skin="easy"] .s-select { border-radius: 10px; }
+:root[data-skin="easy"] .s-actions .sd-btn { border-radius: 9999px; }
+:root[data-skin="easy"] .skin-card { border-radius: 12px; }
+:root[data-skin="easy"] .skin-card[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--sd-line-hover); background: var(--sd-surface); }
+:root[data-skin="easy"] .move .sd-btn { border-radius: 6px; box-shadow: none; background: transparent; }
+
 /* ---------------------------------------------------------------- オブシディアン（既定）
    黒曜石のような真っ黒な面に、髪の毛ほどの細い縁と上辺の光。色は白と灰色だけ。
    動きは、縁を一周する光・滑る面・塗りが走るボタンで見せる（ObsidianUI を参考） */
@@ -853,6 +1097,8 @@ body[data-edge="bottom"] .view.active { transform: none; }
   #panel, #panel.open { clip-path: none; }
   .item, .is-shown .item, .view, .view.active { filter: none; transition-duration: 0.01s; transition-delay: 0s; }
   #hint .r, .icon-btn::before, .bar-slot::before { animation: none; }
+  :root[data-skin] #capsule, :root[data-skin] .is-shown #capsule { animation: none; }
+  :root[data-skin] .switch span::after { animation: none; }
 }
 
 /* ---------------------------------------------------------------- 設定のジェスチャー */
@@ -874,6 +1120,9 @@ body[data-edge="bottom"] .view.active { transform: none; }
 .skin-card[aria-pressed="true"] { color: var(--sd-ink); box-shadow: inset 0 0 0 1.5px var(--sd-accent); background: color-mix(in srgb, var(--sd-accent) 10%, transparent); }
 .mini { position: relative; width: 48px; height: 18px; display: flex; align-items: center; justify-content: center; gap: 4px; }
 .mini i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.7; }
+.mini.easy { border-radius: 9999px; background: #0e0e0e; box-shadow: inset 0 0 0 1px #1f1f1f, 0 6px 12px -4px rgba(0, 0, 0, 0.6); gap: 3px; width: 52px; }
+.mini.easy i { width: 9px; height: 9px; background: #141414; box-shadow: inset 0 0 0 1px #2a2a2a; opacity: 1; }
+.mini.easy i:first-child { background: #fafafa; box-shadow: none; }
 .mini.obsidian { border-radius: 9px; background: linear-gradient(180deg, #121212, #030303); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 0 0 1px #000, 0 6px 10px -4px rgba(0, 0, 0, 0.7); color: #fafafa; }
 .mini.obsidian::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; background: conic-gradient(from 200deg, transparent 0 70%, rgba(255, 255, 255, 0.7) 85%, transparent 95%); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .mini.glass { border-radius: 9px; background: linear-gradient(180deg, #2f323a, #141519); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 8px -3px rgba(0, 0, 0, 0.6); color: #eef; }
