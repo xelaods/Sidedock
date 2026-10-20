@@ -1,0 +1,12 @@
+{
+  "id": "sidedock.games",
+  "name": "ゲーム記録",
+  "version": "1.0.0",
+  "description": "全画面で遊んだゲームの時間を自動で記録し、日ごとのグラフとランキングで振り返れます",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "panel": { "entry": "panel.html", "title": "ゲーム記録", "width": 330 },
+  "permissions": ["activity", "app"],
+  "defaultEnabled": false
+}

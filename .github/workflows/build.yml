@@ -37,7 +37,7 @@ jobs:
         run: |
           $m = Get-ChildItem -Recurse -Filter manifest.json src-tauri/target/release/addons
           $m | ForEach-Object { $_.FullName }
-          if ($m.Count -lt 25) { throw "同梱アドオンが見つかりません" }
+          if ($m.Count -lt 27) { throw "同梱アドオンが見つかりません" }
 
       - name: Upload installer
         uses: actions/upload-artifact@v4

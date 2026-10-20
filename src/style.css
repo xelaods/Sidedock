@@ -617,6 +617,11 @@ body[data-edge="bottom"].is-shown.settled .icon-btn.hover { transform: translate
 :root[data-skin="classic"] .s-group { box-shadow: inset 1px 1px 0 var(--bevel-lo), inset -1px -1px 0 var(--bevel-hi); background: transparent; }
 :root[data-skin="classic"] #handle { border-radius: 0; background: var(--material-bg); box-shadow: inset -1px -1px 0 var(--bevel-dk), inset 1px 1px 0 var(--bevel-hi); }
 
+/* ---------------------------------------------------------------- 設定のジェスチャー */
+.s-select { width: 132px; flex: none; min-height: 28px; padding: 0 8px; font-size: 12px; }
+.s-gesture { transition: opacity 0.2s; }
+.s-gesture.off { opacity: 0.4; pointer-events: none; }
+
 /* ---------------------------------------------------------------- 設定画面のデザイン見本 */
 
 .skins { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }

@@ -2,6 +2,7 @@ mod addons;
 mod clipboard;
 mod config;
 mod files;
+mod gamelog;
 mod log;
 mod media;
 mod overlay;
@@ -409,6 +410,26 @@ fn dark_set(dark: bool) -> Result<(), String> {
 }
 
 #[tauri::command(async)]
+fn files_exist(paths: Vec<String>) -> Vec<bool> {
+    files::exist(&paths)
+}
+
+#[tauri::command(async)]
+fn files_drag(app: AppHandle, paths: Vec<String>) -> Result<String, String> {
+    files::start_drag(&app, paths)
+}
+
+#[tauri::command(async)]
+fn game_log() -> gamelog::Snapshot {
+    gamelog::snapshot()
+}
+
+#[tauri::command(async)]
+fn game_log_clear(exe: Option<String>) {
+    gamelog::clear(exe.as_deref());
+}
+
+#[tauri::command(async)]
 fn recent_files(limit: Option<usize>) -> Vec<files::RecentFile> {
     files::recent(limit.unwrap_or(30).min(100))
 }
@@ -564,6 +585,7 @@ pub fn run() {
             apply_shell(&handle, &config);
             overlay::layout(&handle);
             overlay::show(&handle);
+            gamelog::init(&handle);
             overlay::start(handle);
             Ok(())
         })
@@ -622,6 +644,10 @@ pub fn run() {
             dark_set,
             battery_get,
             recent_files,
+            files_exist,
+            files_drag,
+            game_log,
+            game_log_clear,
             net_speed,
             set_low_memory,
         ])
@@ -632,6 +658,7 @@ pub fn run() {
         // 終了するときは、隠していた Windows のタスクバーを必ず元に戻す
         if let RunEvent::Exit = event {
             tray::shutdown();
+            gamelog::flush();
             taskbar::restore();
         }
     });

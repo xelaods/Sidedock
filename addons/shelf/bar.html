@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  #btn { width: auto; min-width: 32px; padding: 0 8px; gap: 5px; display: inline-flex; }
+  #btn:hover { transform: none; }
+  #btn svg { width: 18px; height: 18px; transition: transform 0.5s var(--sd-ease); }
+  #n { font: 600 11.5px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; }
+  #n:empty { display: none; }
+  body.has svg { color: var(--sd-accent); }
+  /* 受け取った瞬間、トレイが少し沈んで戻る */
+  body.got svg { animation: got 0.6s var(--sd-ease); }
+  @keyframes got { 0% { transform: none; } 30% { transform: translateY(3px) scale(1.12, 0.88); } 100% { transform: none; } }
+</style>
+</head>
+<body>
+  <button id="btn" class="sd-bar-btn" aria-label="置き場" data-hint="置き場：ファイルをここにドロップ">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 13.5l2.2-6.4A2 2 0 0 1 7.6 5.7h8.8a2 2 0 0 1 1.9 1.4l2.2 6.4"/><path d="M3.5 13.5h4.6l1.4 2.2h5l1.4-2.2h4.6V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+    <span id="n"></span>
+  </button>
+<script type="module">
+  import { load, addPaths } from "./store.js";
+  const render = (d) => {
+    const n = d?.items?.length ?? 0;
+    document.getElementById("n").textContent = n ? String(n) : "";
+    document.body.classList.toggle("has", n > 0);
+    document.getElementById("btn").dataset.hint = n ? `置き場：${n} 件` : "置き場：ファイルをここにドロップ";
+  };
+  // ドロップは、いつも読み込まれているバーの側で受け取る（パネルと二重にならないように）
+  SideDock.on("drop", async ({ paths }) => {
+    if (!paths?.length) return;
+    const added = await addPaths(paths);
+    render(await load());
+    document.body.classList.remove("got");
+    void document.body.offsetWidth;
+    document.body.classList.add("got");
+    SideDock.ui.notify(added ? `置き場に ${added} 件預けました` : "もう置き場にあります", 1600);
+  });
+  SideDock.on("storageChanged", render);
+  await SideDock.ready;
+  render(await load());
+</script>
+</body>
+</html>

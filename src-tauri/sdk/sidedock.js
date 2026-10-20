@@ -229,6 +229,17 @@
     files: {
       /** 最近使ったファイル：[{ name, path, at, isDir }]（権限 files） */
       recent: (limit = 30) => call("files.recent", { limit }),
+      /** ファイルが今もあるか：[true, false, …]（権限 files） */
+      exists: (paths) => call("files.exists", { paths }),
+      /** ファイルをつかんで他のアプリへドラッグで渡す。マウスのボタンを押している間に呼ぶ。
+          ドロップされると "copy" | "move" | "link" | "none" で解決する（権限 files） */
+      drag: (paths) => call("files.drag", { paths }),
+    },
+    games: {
+      /** 全画面で遊んだゲームの記録：{ days: { "YYYY-MM-DD": { exe: 秒 } }, names: { exe: 名前 }, sessions: [{ exe, start, end }], today, current }（権限 activity） */
+      log: () => call("games.log"),
+      /** 記録を消す。exe を渡すとそのアプリの分だけ（権限 activity） */
+      clear: (exe) => call("games.clear", { exe: exe ?? null }),
     },
     power: {
       /** "lock" | "sleep" | "restart" | "shutdown" | "signout" */

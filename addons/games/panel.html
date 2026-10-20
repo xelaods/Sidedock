@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 12px 12px 10px; }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 2px; border-radius: 9px; background: var(--sd-surface-2); box-shadow: inset 0 0 0 1px var(--sd-line); }
+  .tabs button { appearance: none; border: 0; background: transparent; color: var(--sd-ink-2); font: inherit; font-size: 11.5px; min-height: 24px; border-radius: 7px; cursor: default; transition: background 0.2s, color 0.2s; }
+  .tabs button:hover { color: var(--sd-ink); }
+  .tabs button[aria-pressed="true"] { background: var(--sd-surface); color: var(--sd-ink); box-shadow: inset 0 0 0 1px var(--sd-line); }
+
+  .sum { display: flex; align-items: baseline; gap: 8px; margin: 12px 2px 2px; }
+  #total { font: 600 26px/1 var(--sd-font-display); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  #diff { font-size: 11px; color: var(--sd-ink-2); }
+  #diff.up { color: var(--sd-accent); }
+  #now { margin: 6px 2px 0; font-size: 11.5px; color: var(--sd-accent); }
+
+  .chart { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 76px; margin: 12px 0 2px; padding: 0 2px; }
+  .chart.dense { gap: 2px; }
+  .bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; justify-content: flex-end; min-width: 0; }
+  .bar i {
+    display: block; width: 100%; max-width: 26px; min-height: 2px; border-radius: 4px 4px 2px 2px;
+    background: color-mix(in srgb, var(--sd-ink) 18%, transparent);
+    height: 0; transition: height 0.7s var(--sd-ease); transition-delay: calc(var(--n) * 30ms);
+  }
+  .bar.has i { background: color-mix(in srgb, var(--sd-accent) 55%, transparent); }
+  .bar.today i { background: var(--sd-accent); box-shadow: 0 0 10px -2px var(--sd-glow); }
+  .bar span { font-size: 9.5px; color: var(--sd-ink-3); font-variant-numeric: tabular-nums; }
+  .bar.today span { color: var(--sd-ink); }
+  .chart.dense .bar span { display: none; }
+  .axis { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--sd-ink-3); padding: 0 2px; }
+
+  h3 { margin: 14px 2px 6px; font-size: 11px; font-weight: 600; color: var(--sd-ink-2); }
+  .g { position: relative; display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 9px; }
+  .g:hover { background: var(--sd-hover); }
+  .g img, .g .ph { width: 22px; height: 22px; flex: none; border-radius: 5px; }
+  .g .ph { background: var(--sd-surface); }
+  .g .rk { width: 14px; flex: none; text-align: center; font: 600 11px/1 var(--sd-font-display); color: var(--sd-ink-3); }
+  .g:nth-child(1) .rk { color: var(--sd-accent); }
+  .g .m { flex: 1; min-width: 0; }
+  .g .n { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g .track { height: 3px; margin-top: 4px; border-radius: 2px; background: var(--sd-line); overflow: hidden; }
+  .g .track i { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--sd-accent); transition: width 0.8s var(--sd-ease); }
+  .g .s { flex: none; font-size: 11.5px; color: var(--sd-ink-2); font-variant-numeric: tabular-nums; }
+  .g .acts { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; padding-left: 10px; background: linear-gradient(90deg, transparent, var(--sd-bg-solid, transparent) 10px); }
+  .g:hover .acts { display: flex; }
+  .g:hover .s { visibility: hidden; }
+  .acts button { appearance: none; border: 0; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; background: var(--sd-surface); color: var(--sd-ink-2); cursor: default; padding: 0; }
+  .acts button:hover { background: var(--sd-press); color: var(--sd-ink); }
+  .acts button.warn { color: var(--sd-danger); }
+  .acts svg { width: 13px; height: 13px; }
+
+  .ses { display: flex; justify-content: space-between; gap: 10px; padding: 4px 8px; font-size: 11.5px; }
+  .ses .w { color: var(--sd-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ses .d { flex: none; color: var(--sd-ink-2); font-variant-numeric: tabular-nums; }
+  .empty { padding: 16px 10px; text-align: center; color: var(--sd-ink-2); font-size: 12px; line-height: 1.7; }
+  .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 11px; color: var(--sd-ink-3); }
+  .foot button { appearance: none; border: 0; background: none; color: var(--sd-ink-2); font: inherit; font-size: 11px; cursor: default; padding: 2px 4px; border-radius: 5px; }
+  .foot button:hover { color: var(--sd-ink); background: var(--sd-hover); }
+</style>
+</head>
+<body>
+  <div class="tabs" id="tabs">
+    <button data-p="1">今日</button><button data-p="7">7日</button><button data-p="30">30日</button><button data-p="0">すべて</button>
+  </div>
+  <div class="sum"><span id="total"></span><span id="diff"></span></div>
+  <div id="now" hidden></div>
+  <div class="chart" id="chart"></div>
+  <div class="axis" id="axis"></div>
+  <h3>よく遊んだゲーム</h3>
+  <div id="rank"></div>
+  <h3 id="sesHead">最近のプレイ</h3>
+  <div id="ses"></div>
+  <div class="foot"><span id="hiddenInfo"></span><button id="unhide" hidden>除外をやめる</button></div>
+<script type="module">
+  import { fmt, shift, dayTotal } from "./util.js";
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const WD = "日月火水木金土";
+  const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l18 18"/><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c5 0 8.5 4.5 9.5 6-.4.6-1.2 1.7-2.4 2.8M6.6 6.6C4.6 7.9 3.2 9.8 2.5 12c1 1.5 4.5 6 9.5 6 1.6 0 3-.4 4.3-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/></svg>';
+  const icons = new Map();
+  let log = null;
+  let hidden = new Set();
+  let period = 7;
+
+  const nameOf = (exe) => log.names?.[exe] || exe.split(/[\\/]/).pop().replace(/\.exe$/i, "");
+  const datesOf = (n, end) => Array.from({ length: n }, (_, i) => shift(end, i - n + 1));
+  const allDates = () => Object.keys(log.days ?? {}).sort();
+
+  /** 期間の日付（すべては記録の最初から） */
+  function periodDates() {
+    if (period) return datesOf(period, log.today);
+    const all = allDates();
+    return all.length ? all : [log.today];
+  }
+
+  function sumBy(dates) {
+    const m = new Map();
+    for (const d of dates) for (const [exe, s] of Object.entries(log.days?.[d] ?? {})) {
+      if (!hidden.has(exe)) m.set(exe, (m.get(exe) ?? 0) + s);
+    }
+    return m;
+  }
+
+  function render() {
+    for (const b of $("tabs").children) b.setAttribute("aria-pressed", String(Number(b.dataset.p) === period));
+    const dates = periodDates();
+    const per = sumBy(dates);
+    const total = [...per.values()].reduce((a, b) => a + b, 0);
+    $("total").textContent = fmt(total);
+
+    // 前の同じ長さの期間と比べる
+    if (period) {
+      const prev = [...sumBy(datesOf(period, shift(log.today, -period))).values()].reduce((a, b) => a + b, 0);
+      const d = total - prev;
+      const label = period === 1 ? "昨日" : period === 7 ? "前の週" : "前の 30 日";
+      $("diff").textContent = Math.abs(d) < 60 ? `${label}と同じくらい` : `${label}より ${d > 0 ? "+" : "−"}${fmt(Math.abs(d))}`;
+      $("diff").className = d >= 60 ? "up" : "";
+    } else {
+      $("diff").textContent = `${allDates().length} 日分の記録`;
+      $("diff").className = "";
+    }
+    const cur = log.current && !hidden.has(log.current.exe) ? log.current : null;
+    $("now").hidden = !cur;
+    if (cur) $("now").textContent = `● ${cur.name} をプレイ中（${fmt(cur.secs)}）`;
+
+    // グラフ：今日・7日は直近 7 日、30日・すべては直近 30 日
+    const n = period === 0 || period === 30 ? 30 : 7;
+    const days = datesOf(n, log.today);
+    const vals = days.map((d) => dayTotal(log, d, hidden));
+    const max = Math.max(3600, ...vals);
+    $("chart").classList.toggle("dense", n > 7);
+    $("chart").replaceChildren(...days.map((d, i) => {
+      const b = document.createElement("div");
+      b.className = "bar";
+      b.classList.toggle("has", vals[i] >= 60);
+      b.classList.toggle("today", d === log.today);
+      b.style.setProperty("--n", i);
+      const [y, m, dd] = d.split("-").map(Number);
+      const wd = WD[new Date(y, m - 1, dd).getDay()];
+      b.title = `${m}/${dd}（${wd}） ${fmt(vals[i])}`;
+      b.innerHTML = `<i></i><span>${d === log.today ? "今日" : wd}</span>`;
+      requestAnimationFrame(() => requestAnimationFrame(() => (b.querySelector("i").style.height = `${Math.max(2, (vals[i] / max) * 62)}px`)));
+      return b;
+    }));
+    const md = (d) => d.slice(5).replace("-", "/").replace(/^0/, "").replace("/0", "/");
+    $("axis").innerHTML = n > 7 ? `<span>${md(days[0])}</span><span>${md(days[days.length - 1])}</span>` : "";
+
+    // ランキング
+    const ranked = [...per.entries()].filter(([, s]) => s >= 60).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if (!ranked.length) {
+      $("rank").innerHTML = `<div class="empty">${allDates().length ? "この期間は遊んでいません" : "ゲームを全画面で遊ぶと、自動で記録されます。<br>ブラウザや動画の全画面は数えません"}</div>`;
+    } else {
+      const top = ranked[0][1];
+      $("rank").replaceChildren(...ranked.map(([exe, s], i) => row(exe, s, i, top, total)));
+    }
+
+    // 最近のプレイ
+    const ses = (log.sessions ?? []).filter((x) => !hidden.has(x.exe)).slice(-5).reverse();
+    $("sesHead").hidden = !ses.length;
+    $("ses").innerHTML = ses.map((x) => {
+      const t = new Date(x.start);
+      const when = `${t.getMonth() + 1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2, "0")}`;
+      return `<div class="ses"><span class="w">${esc(when)}　${esc(nameOf(x.exe))}</span><span class="d">${fmt((x.end - x.start) / 1000)}</span></div>`;
+    }).join("");
+
+    $("hiddenInfo").textContent = hidden.size ? `${hidden.size} 個のアプリを除外中` : "";
+    $("unhide").hidden = !hidden.size;
+  }
+
+  function row(exe, s, i, top, total) {
+    const r = document.createElement("div");
+    r.className = "g";
+    const icon = icons.get(exe);
+    r.innerHTML = `<span class="rk">${i + 1}</span>${icon ? `<img alt="" src="${icon}">` : '<span class="ph"></span>'}
+      <div class="m"><div class="n" title="${esc(exe)}">${esc(nameOf(exe))}</div><div class="track"><i></i></div></div>
+      <span class="s">${fmt(s)}</span>
+      <span class="acts"><button class="hide" aria-label="ゲームではないので除外" title="ゲームではないので除外">${EYE}</button><button class="del" aria-label="記録を消す" title="記録を消す">${TRASH}</button></span>`;
+    requestAnimationFrame(() => requestAnimationFrame(() => (r.querySelector(".track i").style.width = `${(s / top) * 100}%`)));
+    r.title = `${fmt(s)}（${Math.round((s / Math.max(1, total)) * 100)}%）`;
+    if (!icon) {
+      SideDock.app.icon(exe).then((url) => {
+        icons.set(exe, url);
+        const ph = r.querySelector(".ph");
+        if (ph) ph.outerHTML = `<img alt="" src="${url}">`;
+      }).catch(() => {});
+    }
+    r.querySelector(".hide").addEventListener("click", async () => {
+      hidden.add(exe);
+      await saveHidden();
+      render();
+    });
+    let armed = 0;
+    const del = r.querySelector(".del");
+    del.addEventListener("click", async () => {
+      if (Date.now() - armed > 2500) {
+        armed = Date.now();
+        del.classList.add("warn");
+        del.title = "もう一度押すと、このゲームの記録をすべて消します";
+        setTimeout(() => del.classList.remove("warn"), 2500);
+        return;
+      }
+      await SideDock.games.clear(exe);
+      await refresh();
+    });
+    return r;
+  }
+
+  async function saveHidden() {
+    await SideDock.storage.set({ hidden: [...hidden] });
+  }
+
+  $("tabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    period = Number(b.dataset.p);
+    render();
+  });
+  $("unhide").addEventListener("click", async () => {
+    hidden.clear();
+    await saveHidden();
+    render();
+  });
+
+  async function refresh() {
+    log = await SideDock.games.log().catch(() => null);
+    if (!log) return;
+    const d = (await SideDock.storage.get()) ?? {};
+    hidden = new Set(Array.isArray(d.hidden) ? d.hidden : []);
+    render();
+  }
+  SideDock.on("panelShown", refresh);
+  SideDock.on("storageChanged", refresh);
+  await SideDock.ready;
+  refresh();
+</script>
+</body>
+</html>

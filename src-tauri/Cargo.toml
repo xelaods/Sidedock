@@ -1,6 +1,6 @@
 [package]
 name = "sidedock"
-version = "0.7.0"
+version = "0.8.0"
 description = "画面上部に隠れていて、近づくと出てくるランチャー"
 authors = ["xelaods"]
 edition = "2021"
@@ -48,6 +48,8 @@ windows = { version = "0.62", features = [
   "Win32_NetworkManagement_WiFi",
   "Win32_System_Com_StructuredStorage",
   "Win32_System_DataExchange",
+  "Win32_System_Ole",
+  "Win32_System_SystemInformation",
   "Win32_System_Power",
   "Win32_System_Shutdown",
   "Win32_System_Threading",
@@ -55,6 +57,7 @@ windows = { version = "0.62", features = [
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_Controls",
   "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
   "Win32_UI_WindowsAndMessaging",
 ] }
 

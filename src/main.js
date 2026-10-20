@@ -43,7 +43,8 @@ const PERMISSION_LABELS = {
   network: "インターネットに接続する",
   windows: "開いているウィンドウの一覧・切り替え、スタートメニューを開く",
   settings: "Wi-Fi・Bluetooth・明るさ・ダークモードを変える",
-  files: "最近使ったファイルの一覧を見る",
+  files: "最近使ったファイルの一覧を見る・ファイルをドラッグで渡す",
+  activity: "全画面で遊んだゲームの記録を見る",
   media: "再生中の音楽を見る・操作する",
   system: "CPU・メモリ・バッテリーの状態を見る",
   clipboard: "コピーした文字の履歴を見る",
@@ -326,6 +327,7 @@ function onCursor(p) {
   }
   state.cursor = p;
   if (state.suspended) return;
+  detectGesture(p);
   if (state.phase === "hidden") {
     updateProximity(p);
     if (p && inTriggerZone(p)) {
@@ -361,6 +363,163 @@ function onSuspend(on) {
   }
   syncHitRects();
   if (!on && alwaysShow()) reveal();
+}
+
+// --------------------------------------------------------------------- ドロップ
+
+const SHELF = "sidedock.shelf";
+
+/** ドロップされた位置（物理ピクセル）にあるアドオンの id */
+function dropTarget(pos) {
+  if (!pos) return null;
+  const p = { x: pos.x / devicePixelRatio, y: pos.y / devicePixelRatio };
+  if (state.active && state.active !== "settings" && state.panelRect && inside(p, state.panelRect)) return state.active;
+  for (const [id, node] of state.barSlots) {
+    const r = node.getBoundingClientRect();
+    if (p.x >= r.left && p.x <= r.right && p.y >= r.top - 6 && p.y <= r.bottom + 6) return id;
+  }
+  return null;
+}
+
+// --------------------------------------------------------------------- ジェスチャー
+// 画面の端（カーソルがそれ以上進めない所）での動きを見分ける。
+// 端に沿って素早く払う・小刻みに振る・角に押し当てる、の 3 種類
+
+const GESTURES = [
+  ["swipeRight", "右へ払う", "端に沿って右へ素早く動かす"],
+  ["swipeLeft", "左へ払う", "端に沿って左へ素早く動かす"],
+  ["shake", "小刻みに振る", "端で左右に 2 往復ほど振る"],
+  ["cornerLeft", "左の角", "左の角に押し当てて少し止める"],
+  ["cornerRight", "右の角", "右の角に押し当てて少し止める"],
+];
+
+const media = (action, label) => async () => {
+  await invoke("media_control", { action });
+  return label;
+};
+const shell = (action) => async () => {
+  state.holdOpen = 0;
+  state.pinned = false;
+  conceal();
+  await invoke("shell_action", { action });
+};
+const openAddon = (id, name) => async () => {
+  if (id !== "settings" && !enabledAddons().some((a) => a.id === id)) return `「${name}」アドオンが無効です`;
+  reveal({ pinned: true });
+  await openPanel(id);
+};
+
+/** 割り当てられる操作：[名前, 実行（戻り値の文字は知らせとして出す）] */
+const GESTURE_ACTIONS = {
+  none: ["なし", null],
+  "media.toggle": ["再生 / 一時停止", media("toggle", "⏯ 再生 / 一時停止")],
+  "media.next": ["次の曲", media("next", "⏭ 次の曲")],
+  "media.prev": ["前の曲", media("prev", "⏮ 前の曲")],
+  mute: ["ミュートの切り替え", async () => {
+    const v = await invoke("volume_get");
+    await invoke("volume_set_mute", { muted: !v.muted });
+    return v.muted ? "🔊 ミュートを解除" : "🔇 ミュート";
+  }],
+  desktop: ["デスクトップを表示", shell("desktop")],
+  taskview: ["タスクビュー", shell("taskview")],
+  start: ["スタートメニュー", shell("start")],
+  notifications: ["通知センター", shell("notifications")],
+  screenshot: ["スクショ（範囲を選ぶ）", async () => {
+    state.holdOpen = 0;
+    state.pinned = false;
+    conceal();
+    await invoke("app_launch", { path: "ms-screenclip:", args: null });
+  }],
+  lock: ["画面をロック", () => invoke("power_action", { action: "lock" })],
+  "open.shelf": ["置き場を開く", openAddon(SHELF, "置き場")],
+  "open.search": ["検索を開く", async () => {
+    const r = await openAddon("sidedock.search", "検索")();
+    if (!r) invoke("take_focus").catch(() => {});
+    return r;
+  }],
+  "open.clipboard": ["クリップボード履歴を開く", openAddon("sidedock.clipboard", "クリップボード履歴")],
+  "open.settings": ["SideDock の設定", openAddon("settings", "設定")],
+};
+
+const gst = { stroke: null, corner: null, cool: 0 };
+
+/** 端からの距離（上に出すときは上端、下に出すときは下端） */
+function edgeDist(p) {
+  return atBottom() ? innerHeight - p.y : p.y;
+}
+
+function runGesture(name) {
+  const now = performance.now();
+  if (now < gst.cool) return;
+  const action = GESTURE_ACTIONS[state.config.gestures?.[name]];
+  if (!action?.[1]) return;
+  gst.cool = now + 700;
+  log(`ジェスチャー：${name} → ${state.config.gestures[name]}`);
+  Promise.resolve()
+    .then(action[1])
+    .then((text) => text && notify(text, 1300))
+    .catch((e) => notify(String((typeof e === "string" ? e : e?.message) || "うまくいきませんでした").slice(0, 60), 1800));
+}
+
+function endStroke() {
+  clearTimer("gstroke");
+  const s = gst.stroke;
+  gst.stroke = null;
+  if (!s || s.fired) return;
+  const total = s.lastX - s.x0;
+  if (s.reversals === 0 && Math.abs(total) >= 200 && s.lastT - s.t0 <= 450) {
+    runGesture(total > 0 ? "swipeRight" : "swipeLeft");
+  }
+}
+
+function detectGesture(p) {
+  const g = state.config.gestures;
+  if (!g?.enabled) return;
+  if (!p || edgeDist(p) > 3) {
+    endStroke();
+    gst.corner = null;
+    clearTimer("gcorner");
+    return;
+  }
+  const now = performance.now();
+
+  // 角：押し当てたまま少し止める（カーソルが動かないと位置が届かないので、時間で確かめる）
+  const corner = p.x <= 2 ? "cornerLeft" : p.x >= innerWidth - 3 ? "cornerRight" : null;
+  if (corner !== gst.corner) {
+    gst.corner = corner;
+    clearTimer("gcorner");
+    if (corner && g[corner] && g[corner] !== "none") {
+      state.timers.gcorner = setTimeout(() => {
+        state.timers.gcorner = 0;
+        const c = state.cursor;
+        if (gst.corner === corner && c && edgeDist(c) <= 3) runGesture(corner);
+      }, 450);
+    }
+  }
+
+  // 払う・振る
+  let s = gst.stroke;
+  if (!s || now - s.t0 > 1200) {
+    s = gst.stroke = { x0: p.x, t0: now, lastX: p.x, lastT: now, dir: 0, legStart: p.x, reversals: 0, fired: false };
+  }
+  const dx = p.x - s.lastX;
+  if (Math.abs(dx) >= 2) {
+    const d = Math.sign(dx);
+    if (s.dir && d !== s.dir) {
+      if (Math.abs(s.lastX - s.legStart) >= 30) s.reversals++;
+      s.legStart = s.lastX;
+    }
+    s.dir = d;
+    s.lastX = p.x;
+    s.lastT = now;
+    if (!s.fired && s.reversals >= 3 && now - s.t0 <= 1000) {
+      s.fired = true;
+      runGesture("shake");
+    }
+  }
+  // 止まったら（位置が届かなくなったら）ひと続きの動きとして見分ける
+  clearTimer("gstroke");
+  state.timers.gstroke = setTimeout(endStroke, 130);
 }
 
 // --------------------------------------------------------------------- ヒント
@@ -778,6 +937,22 @@ const API = {
   },
 
   "files.recent": { perm: "files", run: (f, p) => invoke("recent_files", { limit: Number(p.limit) || 30 }) },
+  "files.exists": {
+    perm: "files",
+    run: (f, p) => invoke("files_exist", { paths: (Array.isArray(p.paths) ? p.paths : []).slice(0, 300).map(String) }),
+  },
+  "files.drag": {
+    perm: "files",
+    run: (f, p) => {
+      const paths = (Array.isArray(p.paths) ? p.paths : []).slice(0, 300).map(String);
+      if (!paths.length) throw new Error("ファイルがありません");
+      // 渡す先が隠れないよう、カーソルが離れたら普段どおり引っ込める
+      state.pinned = false;
+      return invoke("files_drag", { paths });
+    },
+  },
+  "games.log": { perm: "activity", run: () => invoke("game_log") },
+  "games.clear": { perm: "activity", run: (f, p) => invoke("game_log_clear", { exe: p.exe == null ? null : String(p.exe) }) },
   "system.netSpeed": {
     perm: "system",
     run: async () => {
@@ -1047,11 +1222,13 @@ function renderSettings() {
   root.replaceChildren(...[
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.7.0" })),
+      el("span", { className: "s-ver", textContent: "0.8.0" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
     el("div", { className: "s-sec", textContent: "デザイン" }),
     renderDesign(),
+    el("div", { className: "s-sec", textContent: "ジェスチャー" }),
+    renderGestures(),
     el("div", { className: "s-sec", textContent: "アドオン" }),
     el("div", { id: "s-addons" }, renderAddonList()),
     el("div", { className: "s-actions" }, openFolder, reloadBtn, quitBtn),
@@ -1063,6 +1240,31 @@ function renderSettings() {
       textContent: "アドオンフォルダに manifest.json を含むフォルダを置いて「読み直す」を押すと、一覧に出てきます。",
     }),
   ].filter(Boolean));
+}
+
+/** 設定の「ジェスチャー」：画面の端での動きと、割り当てる操作 */
+function renderGestures() {
+  const g = { ...state.config.gestures };
+  const rows = GESTURES.map(([key, title, sub]) => {
+    const select = el("select", { className: "sd-select s-select", ariaLabel: title });
+    for (const [id, [label]] of Object.entries(GESTURE_ACTIONS)) {
+      select.append(el("option", { value: id, textContent: label, selected: g[key] === id }));
+    }
+    select.addEventListener("change", () => {
+      saveConfig({ gestures: { ...state.config.gestures, [key]: select.value } });
+    });
+    return row(title, sub, select, "s-gesture");
+  });
+  const setDisabled = (on) => { for (const r of rows) r.classList.toggle("off", !on); };
+  setDisabled(g.enabled);
+  return el("div", { className: "s-group" },
+    row("画面の端のジェスチャー", "端（カーソルがそれ以上進めない所）での動きで操作します。全画面のアプリを使っている間は止まります",
+      toggle(g.enabled, "画面の端のジェスチャー", (v) => {
+        saveConfig({ gestures: { ...state.config.gestures, enabled: v } });
+        setDisabled(v);
+      })),
+    ...rows,
+  );
 }
 
 /** 設定の「デザイン」：見た目の見本とアクセントカラー */
@@ -1146,10 +1348,15 @@ async function start() {
   });
 
   // ドロップされたファイルは drop 権限のあるアドオンへ
+  // 落とした場所のアドオン（バーの項目か、開いているパネル）にだけ渡す。
+  // どれでもない所なら置き場へ。置き場がなければ、受け取れるアドオンすべてへ
   await webview.onDragDropEvent(({ payload }) => {
-    if (payload.type === "drop" && payload.paths?.length) {
-      broadcast("drop", { paths: payload.paths }, { permission: "drop" });
-    }
+    if (payload.type !== "drop" || !payload.paths?.length) return;
+    const data = { paths: payload.paths };
+    const target = dropTarget(payload.position);
+    if (target && hasPermission(target, "drop")) return broadcast("drop", data, { addonId: target });
+    if (enabledAddons().some((a) => a.id === SHELF)) return broadcast("drop", data, { addonId: SHELF });
+    broadcast("drop", data, { permission: "drop" });
   });
 
   // クリップボードの履歴を使うアドオンが有効なら、起動直後から記録を始める

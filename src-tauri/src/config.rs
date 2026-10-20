@@ -11,6 +11,54 @@ pub struct AddonEntry {
     pub enabled: bool,
 }
 
+/// 画面の端でのジェスチャーと、それぞれに割り当てた操作
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Gestures {
+    pub enabled: bool,
+    /// 端に沿って右へ素早く払う
+    pub swipe_right: String,
+    /// 端に沿って左へ素早く払う
+    pub swipe_left: String,
+    /// 端で左右に小刻みに振る
+    pub shake: String,
+    /// 左の角に押し当てて少し止める
+    pub corner_left: String,
+    /// 右の角に押し当てて少し止める
+    pub corner_right: String,
+}
+
+impl Default for Gestures {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            swipe_right: "media.next".into(),
+            swipe_left: "media.prev".into(),
+            shake: "media.toggle".into(),
+            corner_left: "none".into(),
+            corner_right: "none".into(),
+        }
+    }
+}
+
+impl Gestures {
+    fn sanitize(mut self) -> Self {
+        // 操作の名前は本体（main.js）が知っているものだけを実行するので、ここでは長さだけ見る
+        for v in [
+            &mut self.swipe_right,
+            &mut self.swipe_left,
+            &mut self.shake,
+            &mut self.corner_left,
+            &mut self.corner_right,
+        ] {
+            if v.is_empty() || v.len() > 40 {
+                *v = "none".into();
+            }
+        }
+        self
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Config {
@@ -30,6 +78,8 @@ pub struct Config {
     pub skin: String,
     /// アクセントカラー："blue" | "violet" | "pink" | "orange" | "green" | "mono"
     pub accent: String,
+    /// 画面の端でのジェスチャー
+    pub gestures: Gestures,
     /// アドオンの並び順と有効/無効
     pub addons: Vec<AddonEntry>,
 }
@@ -45,6 +95,7 @@ impl Default for Config {
             hide_taskbar: false,
             skin: "glass".into(),
             accent: "blue".into(),
+            gestures: Gestures::default(),
             addons: Vec::new(),
         }
     }
@@ -75,6 +126,7 @@ impl Config {
         if !matches!(self.accent.as_str(), "blue" | "violet" | "pink" | "orange" | "green" | "mono") {
             self.accent = d.accent;
         }
+        self.gestures = self.gestures.sanitize();
         let mut seen = std::collections::HashSet::new();
         self.addons.retain(|a| seen.insert(a.id.clone()));
         self

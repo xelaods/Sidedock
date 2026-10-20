@@ -32,6 +32,20 @@
 | QR コード | コピーした URL や文字を QR コードにして、スマホで開く |
 | 最近のファイル | 最近開いたファイルやフォルダをすぐ開く |
 | ネット速度 | 今のダウンロード・アップロードの速さをカプセルに表示 |
+| 置き場 | ファイルをカプセルにドロップして一時的に預け、あとでドラッグして他のアプリやフォルダへ渡す。文字も預けられる |
+| ゲーム記録 | 全画面で遊んだゲームの時間を自動で記録。日ごとのグラフ・ランキング・最近のプレイ（ブラウザや動画の全画面は数えない） |
+
+### 画面の端のジェスチャー
+
+カーソルを画面の端（カプセルが出てくる側）に押し当てたまま動かすと、操作を呼び出せます。設定の「ジェスチャー」で、それぞれに好きな操作を割り当てられます。全画面のアプリを使っている間は反応しません。
+
+| ジェスチャー | 動かし方 | 最初の割り当て |
+| --- | --- | --- |
+| 右へ払う / 左へ払う | 端に沿って素早く横へ動かす | 次の曲 / 前の曲 |
+| 小刻みに振る | 端で左右に 2 往復ほど振る | 再生 / 一時停止 |
+| 左の角 / 右の角 | 角に押し当てて少し止める | なし |
+
+割り当てられる操作：再生 / 一時停止・次の曲・前の曲・ミュート・デスクトップを表示・タスクビュー・スタートメニュー・通知センター・スクショ・画面をロック・置き場 / 検索 / クリップボード履歴 / 設定を開く
 
 ### デザイン
 
@@ -141,7 +155,7 @@ my-addon/
 | --- | --- |
 | `app` | `SideDock.app.launch()` でアプリ・ファイル・フォルダを開く、`app.icon()` でアイコンを取得 |
 | `dialog` | `SideDock.dialog.pickFiles()` / `pickFolder()` でファイル選択画面を出す |
-| `drop` | バーにドロップされたファイルを `drop` イベントで受け取る |
+| `drop` | ドロップされたファイルを `drop` イベントで受け取る（落とした場所のアドオンにだけ届く。カプセルのどこでもない所なら置き場へ） |
 | `browser` | `SideDock.browser.list()` でブラウザ一覧、`browser.open(url, browserId)` でページを開く |
 | `volume` | `SideDock.volume.get()` / `set(0〜1)` / `setMute(true/false)` |
 | `network` | インターネットへの接続（ないと外部のサーバーへの通信はすべて止められる） |
@@ -150,7 +164,8 @@ my-addon/
 | `clipboard` | `SideDock.clipboard.write(文字)`（これだけは権限なしでも使える）、`SideDock.clipboard.list()` / `copy(id)` / `pin(id, true)` / `remove(id)` / `clear()`、`clipboardChanged` イベント |
 | `power` | `SideDock.power.action("lock" \| "sleep" \| "restart" \| "shutdown" \| "signout")` |
 | `settings` | `SideDock.net.status()`、`SideDock.wifi.list()` / `connect(ssid)`、`SideDock.radios.get()` / `set("wifi" \| "bluetooth", true)`、`SideDock.brightness.get()` / `set(0〜100)`、`SideDock.theme.getDark()` / `setDark(true)`、`networkChanged` イベント |
-| `files` | `SideDock.files.recent(件数)` で最近開いたファイル・フォルダ（`{ name, path, at, isDir }`） |
+| `files` | `SideDock.files.recent(件数)` で最近開いたファイル・フォルダ（`{ name, path, at, isDir }`）、`files.exists(paths)`、`files.drag(paths)`（マウスのボタンを押している間に呼ぶと、ファイルをつかんで他のアプリへドラッグで渡せる） |
+| `activity` | `SideDock.games.log()` で全画面で遊んだゲームの記録、`games.clear(exe)` で消す |
 | `windows` | `SideDock.windows.list()` / `icon(id, exe)` / `activate(id)` / `focus(id)` / `close(id)`、`SideDock.tray.list()` / `click(key, "left" \| "right" \| "double")`、`SideDock.shell.action("start" \| "quick" \| "notifications" \| "desktop" \| "taskview")`、`trayChanged` イベント |
 
 権限がなくても、`SideDock.storage.get()` / `set(data)` でアドオン専用の保存領域（JSON）が使えます。

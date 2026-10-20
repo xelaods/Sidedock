@@ -99,3 +99,86 @@ pub fn recent(limit: usize) -> Vec<RecentFile> {
 pub fn recent(_limit: usize) -> Vec<RecentFile> {
     Vec::new()
 }
+
+/// ファイルが今もあるか（置き場に預けたものが動かされていないか）
+pub fn exist(paths: &[String]) -> Vec<bool> {
+    paths
+        .iter()
+        .map(|p| std::path::Path::new(p).exists())
+        .collect()
+}
+
+/// ファイルをつかんで、エクスプローラーや他のアプリへドラッグで渡す。
+/// マウスのボタンが押されている間に呼ぶ。ドロップされるまで戻らない。
+/// 戻り値は相手が受け取った方法："copy" | "move" | "link" | "none"
+#[cfg(windows)]
+pub fn start_drag(app: &tauri::AppHandle, paths: Vec<String>) -> Result<String, String> {
+    use std::sync::mpsc;
+    let (tx, rx) = mpsc::channel();
+    // OLE のドラッグは、ウィンドウのある（STA の）メインスレッドで行う
+    app.run_on_main_thread(move || {
+        let _ = tx.send(drag_on_main(&paths));
+    })
+    .map_err(|e| e.to_string())?;
+    rx.recv().map_err(|e| e.to_string())?
+}
+
+#[cfg(windows)]
+fn drag_on_main(paths: &[String]) -> Result<String, String> {
+    use windows::{
+        core::HSTRING,
+        Win32::{
+            System::{
+                Com::IDataObject,
+                Ole::{
+                    IDropSource, OleInitialize, DROPEFFECT_COPY, DROPEFFECT_LINK,
+                    DROPEFFECT_MOVE,
+                },
+            },
+            UI::Shell::{Common::ITEMIDLIST, ILCreateFromPathW, ILFree, SHCreateDataObject, SHDoDragDrop},
+        },
+    };
+    unsafe {
+        let _ = OleInitialize(None);
+        let pidls: Vec<*const ITEMIDLIST> = paths
+            .iter()
+            .filter(|p| std::path::Path::new(p).exists())
+            .map(|p| ILCreateFromPathW(&HSTRING::from(p.as_str())) as *const ITEMIDLIST)
+            .filter(|p| !p.is_null())
+            .collect();
+        if pidls.is_empty() {
+            return Err("ファイルが見つかりません".into());
+        }
+        // 親を指定しないと、それぞれの場所を絶対位置として扱う
+        let data: windows::core::Result<IDataObject> =
+            SHCreateDataObject(None, Some(&pidls), None::<&IDataObject>);
+        let result = data.and_then(|data| {
+            // 送り元を省くと、Windows がアイコン付きの標準のドラッグを用意してくれる
+            SHDoDragDrop(
+                None,
+                &data,
+                None::<&IDropSource>,
+                DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK,
+            )
+        });
+        for p in pidls {
+            ILFree(Some(p));
+        }
+        let effect = result.map_err(|e| e.to_string())?;
+        Ok(if effect.0 & DROPEFFECT_MOVE.0 != 0 {
+            "move"
+        } else if effect.0 & DROPEFFECT_COPY.0 != 0 {
+            "copy"
+        } else if effect.0 & DROPEFFECT_LINK.0 != 0 {
+            "link"
+        } else {
+            "none"
+        }
+        .into())
+    }
+}
+
+#[cfg(not(windows))]
+pub fn start_drag(_app: &tauri::AppHandle, _paths: Vec<String>) -> Result<String, String> {
+    Err("Windows 専用です".into())
+}

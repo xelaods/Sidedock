@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  #btn { width: auto; min-width: 32px; padding: 0 8px; gap: 5px; display: inline-flex; }
+  #btn:hover { transform: none; }
+  #btn svg { width: 19px; height: 19px; }
+  #t { font: 600 11.5px/1 var(--sd-font-display); font-variant-numeric: tabular-nums; }
+  #t:empty { display: none; }
+  body.played svg { color: var(--sd-accent); }
+</style>
+</head>
+<body>
+  <button id="btn" class="sd-bar-btn" aria-label="ゲーム記録" data-hint="ゲーム記録">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 7.5h9a4.5 4.5 0 0 1 4.4 3.6l.9 4.6a2.4 2.4 0 0 1-4.1 2.1L15.5 15.5h-7l-2.2 2.3a2.4 2.4 0 0 1-4.1-2.1l.9-4.6A4.5 4.5 0 0 1 7.5 7.5z"/><path d="M8 10v3M6.5 11.5h3"/><circle cx="15.5" cy="10.6" r=".6" fill="currentColor"/><circle cx="17" cy="12.4" r=".6" fill="currentColor"/></svg>
+    <span id="t"></span>
+  </button>
+<script type="module">
+  import { fmt, dayTotal, hiddenSet } from "./util.js";
+  async function refresh() {
+    const log = await SideDock.games.log().catch(() => null);
+    if (!log) return;
+    const secs = dayTotal(log, log.today, await hiddenSet());
+    document.getElementById("t").textContent = secs >= 60 ? fmt(secs, { short: true }) : "";
+    document.body.classList.toggle("played", secs >= 60);
+    document.getElementById("btn").dataset.hint = secs >= 60 ? `今日のゲーム：${fmt(secs)}` : "今日はまだ遊んでいません";
+  }
+  // 遊んでいる間は SideDock が隠れているので、出てきたときに取り直せば足りる
+  SideDock.on("revealed", refresh);
+  SideDock.on("storageChanged", refresh);
+  await SideDock.ready;
+  refresh();
+</script>
+</body>
+</html>

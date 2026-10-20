@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://addon.localhost/_sdk/sidedock.css">
+<script src="http://addon.localhost/_sdk/sidedock.js"></script>
+<style>
+  body { padding: 10px; }
+  .top { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+  #count { flex: 1; font-size: 11.5px; color: var(--sd-ink-2); padding-left: 2px; }
+  .top .sd-btn { min-height: 26px; padding: 0 9px; font-size: 11.5px; }
+  #all { cursor: grab; }
+  #all svg { width: 14px; height: 14px; }
+
+  #grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .it {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px 4px 6px; border-radius: 10px; min-width: 0; cursor: grab;
+    transition: background 0.15s, opacity 0.2s, transform 0.35s var(--sd-ease);
+    animation: in 0.45s var(--sd-ease) both;
+  }
+  @keyframes in { from { opacity: 0; transform: translateY(-6px) scale(0.92); } }
+  .it:hover { background: var(--sd-hover); }
+  .it.dragging { opacity: 0.35; transform: scale(0.94); }
+  .it.gone { opacity: 0.45; }
+  .it.gone .nm { text-decoration: line-through; }
+  .ic { width: 32px; height: 32px; display: grid; place-items: center; }
+  .ic img { width: 32px; height: 32px; }
+  .ic .ph { width: 28px; height: 28px; border-radius: 7px; background: var(--sd-surface); }
+  .ic.txt { border-radius: 8px; background: color-mix(in srgb, var(--sd-accent) 16%, var(--sd-surface)); color: var(--sd-accent); font: 700 13px/1 var(--sd-font-display); }
+  .nm {
+    width: 100%; font-size: 10.5px; line-height: 1.3; text-align: center; color: var(--sd-ink);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all;
+  }
+  .x {
+    position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border: 0; border-radius: 9px;
+    display: grid; place-items: center; padding: 0; cursor: default;
+    background: var(--sd-surface); color: var(--sd-ink-2); opacity: 0; transition: opacity 0.15s, background 0.15s;
+  }
+  .x svg { width: 9px; height: 9px; }
+  .it:hover .x { opacity: 1; }
+  .x:hover { background: var(--sd-press); color: var(--sd-ink); }
+
+  .empty { padding: 22px 12px 18px; text-align: center; color: var(--sd-ink-2); font-size: 12px; line-height: 1.7; }
+  .empty svg { width: 34px; height: 34px; color: var(--sd-ink-3); margin-bottom: 6px; animation: bob 2.6s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(3px); } }
+
+  .add { display: flex; gap: 6px; margin-top: 8px; }
+  .add .sd-input { min-height: 30px; font-size: 12px; }
+  .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--sd-ink-2); }
+  .foot label { display: inline-flex; align-items: center; gap: 6px; }
+  .foot input { accent-color: var(--sd-accent); margin: 0; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <span id="count"></span>
+    <button id="all" class="sd-btn" title="押したままドラッグすると、まとめて渡せます" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h11v11"/><path d="M5 10h11v9H5z"/></svg>まとめてドラッグ
+    </button>
+    <button id="clear" class="sd-btn ghost" hidden>空にする</button>
+  </div>
+  <div id="grid"></div>
+  <form class="add" id="addForm">
+    <input id="text" class="sd-input" type="text" placeholder="文字を預ける（貼り付けて Enter）" aria-label="文字を預ける" spellcheck="false" autocomplete="off">
+  </form>
+  <div class="foot">
+    <label><input id="removeAfter" type="checkbox">渡したら置き場から外す</label>
+    <span>クリックで開く</span>
+  </div>
+<script type="module">
+  import { load, save, addText } from "./store.js";
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const X = '<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l6 6M8 2l-6 6"/></svg>';
+  const EMPTY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v8m-3.5-3.5L12 11l3.5-3.5"/><path d="M3.5 13.5h4.6l1.4 2.2h5l1.4-2.2h4.6V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>';
+  const icons = new Map();
+  let data = { items: [], removeAfter: true };
+  let exists = new Map();
+
+  async function checkExists() {
+    const files = data.items.filter((x) => x.kind === "file");
+    if (!files.length) return;
+    const ok = await SideDock.files.exists(files.map((f) => f.path)).catch(() => null);
+    if (!ok) return;
+    files.forEach((f, i) => exists.set(f.path, ok[i]));
+  }
+
+  function render() {
+    const n = data.items.length;
+    const files = data.items.filter((x) => x.kind === "file" && exists.get(x.path) !== false);
+    $("count").textContent = n ? `${n} 件` : "";
+    $("all").hidden = files.length < 2;
+    $("clear").hidden = !n;
+    $("removeAfter").checked = data.removeAfter;
+    if (!n) {
+      $("grid").innerHTML = `<div class="empty" style="grid-column: 1 / -1">${EMPTY}<br>ファイルをカプセルや、ここにドロップすると<br>預けておけます。あとでドラッグして取り出せます</div>`;
+      return;
+    }
+    $("grid").replaceChildren(...data.items.map(tile));
+  }
+
+  function tile(item) {
+    const t = document.createElement("div");
+    t.className = "it";
+    const gone = item.kind === "file" && exists.get(item.path) === false;
+    t.classList.toggle("gone", gone);
+    if (item.kind === "text") {
+      t.innerHTML = `<div class="ic txt">Aa</div><div class="nm">${esc(item.text.slice(0, 60))}</div>`;
+      t.title = "クリックでコピー";
+    } else {
+      const icon = icons.get(item.path);
+      t.innerHTML = `<div class="ic">${icon ? `<img alt="" src="${icon}">` : '<span class="ph"></span>'}</div><div class="nm">${esc(item.name)}</div>`;
+      t.title = gone ? "見つかりません（動かされたか、消されました）" : item.path;
+      if (!icon && !gone) {
+        SideDock.app.icon(item.path).then((url) => {
+          icons.set(item.path, url);
+          const ph = t.querySelector(".ph");
+          if (ph) ph.outerHTML = `<img alt="" src="${url}">`;
+        }).catch(() => {});
+      }
+    }
+    const x = document.createElement("button");
+    x.className = "x";
+    x.innerHTML = X;
+    x.setAttribute("aria-label", "置き場から外す");
+    x.addEventListener("pointerdown", (e) => e.stopPropagation());
+    x.addEventListener("click", (e) => { e.stopPropagation(); remove([item.id]); });
+    t.append(x);
+    if (item.kind === "file" && !gone) dragSource(t, () => [item], () => activate(item));
+    else t.addEventListener("click", () => activate(item));
+    return t;
+  }
+
+  async function activate(item) {
+    if (item.kind === "text") {
+      await SideDock.clipboard.write(item.text).catch(() => {});
+      SideDock.ui.notify("コピーしました", 1200);
+    } else {
+      await SideDock.app.launch(item.path).catch(() => {});
+      SideDock.ui.dismiss();
+    }
+  }
+
+  /** 押したまま少し動かすとドラッグ、動かさずに離すとクリック */
+  function dragSource(node, getItems, onClick) {
+    node.addEventListener("dragstart", (e) => e.preventDefault());
+    node.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const x0 = e.clientX, y0 = e.clientY;
+      let started = false;
+      const move = async (ev) => {
+        if (started || Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+        started = true;
+        cleanup();
+        const items = getItems();
+        node.classList.add("dragging");
+        const result = await SideDock.files.drag(items.map((i) => i.path)).catch(() => "none");
+        node.classList.remove("dragging");
+        await checkExists();
+        // 移動された・消えた、または「渡したら外す」なら置き場から外す
+        const done = items.filter((i) => exists.get(i.path) === false || (result !== "none" && data.removeAfter));
+        if (done.length) await remove(done.map((i) => i.id));
+        else render();
+      };
+      const up = () => {
+        cleanup();
+        if (!started && onClick) onClick();
+      };
+      const cleanup = () => {
+        removeEventListener("pointermove", move);
+        removeEventListener("pointerup", up);
+      };
+      addEventListener("pointermove", move);
+      addEventListener("pointerup", up);
+    });
+  }
+
+  async function remove(ids) {
+    data.items = data.items.filter((i) => !ids.includes(i.id));
+    await save(data);
+    render();
+  }
+
+  dragSource($("all"), () => data.items.filter((x) => x.kind === "file" && exists.get(x.path) !== false));
+
+  let confirmClear = 0;
+  $("clear").addEventListener("click", async () => {
+    if (Date.now() - confirmClear > 2500) {
+      confirmClear = Date.now();
+      $("clear").textContent = "もう一度押すと空に";
+      setTimeout(() => ($("clear").textContent = "空にする"), 2500);
+      return;
+    }
+    $("clear").textContent = "空にする";
+    data.items = [];
+    await save(data);
+    render();
+  });
+
+  $("text").addEventListener("pointerdown", () => SideDock.ui.focus());
+  $("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = $("text").value.trim();
+    if (!v) return;
+    $("text").value = "";
+    await addText(v.slice(0, 5000));
+    data = await load();
+    render();
+  });
+
+  $("removeAfter").addEventListener("change", async () => {
+    data.removeAfter = $("removeAfter").checked;
+    await save(data);
+  });
+
+  async function refresh() {
+    data = await load();
+    await checkExists();
+    render();
+  }
+  SideDock.on("storageChanged", refresh);
+  SideDock.on("panelShown", refresh);
+  await SideDock.ready;
+  refresh();
+</script>
+</body>
+</html>

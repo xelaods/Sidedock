@@ -259,6 +259,7 @@ pub fn start(app: AppHandle) {
                         ov.last_foreground.store(fg, Ordering::SeqCst);
                     }
                     let fullscreen = win::fullscreen_on_same_monitor(own);
+                    crate::gamelog::tick(win::fullscreen_app());
                     let was = ov.suspended.swap(fullscreen, Ordering::SeqCst);
                     if fullscreen != was {
                         crate::log::write(
@@ -443,7 +444,31 @@ mod win {
                     return true;
                 }
             }
+            covers_monitor(GetForegroundWindow(), Some(own))
+        }
+    }
+
+    /// どのディスプレイでもよいので、全画面で前面にあるアプリ（exe のパスとタイトル）。ゲームの記録に使う
+    pub fn fullscreen_app() -> Option<(String, String)> {
+        unsafe {
             let fg = GetForegroundWindow();
+            if fg.is_invalid() || is_own_process(fg) {
+                return None;
+            }
+            let d3d = matches!(SHQueryUserNotificationState(), Ok(s) if s == QUNS_RUNNING_D3D_FULL_SCREEN);
+            if !d3d && !covers_monitor(fg, None) {
+                return None;
+            }
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(fg, Some(&mut pid));
+            let exe = crate::taskbar::exe_of_pid(pid);
+            (!exe.is_empty()).then(|| (exe, title(fg)))
+        }
+    }
+
+    /// ウィンドウがディスプレイ全体を覆っているか（own を渡すと、自分と同じディスプレイのときだけ）
+    unsafe fn covers_monitor(fg: HWND, own: Option<isize>) -> bool {
+        unsafe {
             if fg.is_invalid()
                 || !IsWindowVisible(fg).as_bool()
                 || is_own_process(fg)
@@ -463,8 +488,13 @@ mod win {
                 return false;
             }
             let mon = MonitorFromWindow(fg, MONITOR_DEFAULTTONULL);
-            if mon.is_invalid() || mon != MonitorFromWindow(hwnd(own), MONITOR_DEFAULTTOPRIMARY) {
+            if mon.is_invalid() {
                 return false;
+            }
+            if let Some(own) = own {
+                if mon != MonitorFromWindow(hwnd(own), MONITOR_DEFAULTTOPRIMARY) {
+                    return false;
+                }
             }
             let mut mi = MONITORINFO {
                 cbSize: std::mem::size_of::<MONITORINFO>() as u32,

@@ -1,0 +1,12 @@
+{
+  "id": "sidedock.shelf",
+  "name": "置き場",
+  "version": "1.0.0",
+  "description": "ファイルをカプセルにドロップして一時的に預け、あとでドラッグして取り出せます",
+  "author": "SideDock",
+  "icon": "icon.svg",
+  "bar": { "entry": "bar.html" },
+  "panel": { "entry": "panel.html", "title": "置き場", "width": 320 },
+  "permissions": ["drop", "files", "app"],
+  "defaultEnabled": false
+}

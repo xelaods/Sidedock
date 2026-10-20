@@ -13,6 +13,7 @@ use tauri::{
 
 /// アドオンが要求できる権限
 pub const KNOWN_PERMISSIONS: &[&str] = &[
+    "activity",
     "app",
     "dialog",
     "drop",
