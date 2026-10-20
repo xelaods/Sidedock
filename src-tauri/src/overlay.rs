@@ -61,6 +61,10 @@ pub struct Overlay {
     last_foreground: AtomicIsize,
     /// 画面の下端（タスクバーの位置）に出すか
     pub bottom: AtomicBool,
+    /// 作業領域ではなくディスプレイ全体を基準にする（タスクバーの代わりにしているとき）
+    pub full: AtomicBool,
+    /// 画面の端を確保して、最大化したウィンドウと重ならないようにする
+    pub reserve: AtomicBool,
 }
 
 impl Overlay {
@@ -71,6 +75,8 @@ impl Overlay {
             suspended: AtomicBool::new(false),
             last_foreground: AtomicIsize::new(0),
             bottom: AtomicBool::new(false),
+            full: AtomicBool::new(false),
+            reserve: AtomicBool::new(false),
         }
     }
 
@@ -83,15 +89,21 @@ impl Overlay {
     }
 }
 
-/// 出す端を変える（"top" | "bottom"）。すぐに配置し直す
-pub fn set_edge(app: &AppHandle, edge: &str) {
-    app.state::<Overlay>()
-        .bottom
-        .store(edge == "bottom", Ordering::SeqCst);
+/// 出す端・基準・領域の確保を変えて、すぐに配置し直す
+pub fn configure(app: &AppHandle, bottom: bool, full: bool, reserve: bool) {
+    let ov = app.state::<Overlay>();
+    ov.bottom.store(bottom, Ordering::SeqCst);
+    ov.full.store(full, Ordering::SeqCst);
+    ov.reserve.store(reserve, Ordering::SeqCst);
+    // 必ず配置し直す
+    *ov.geom.lock().unwrap() = Geom::default();
     if layout(app) {
         let _ = app.emit_to("main", "geometry", ());
     }
 }
+
+/// 確保する高さ（論理px）：カプセル 40 ＋ 余白 8 ＋ 少しのすき間
+const RESERVE_HEIGHT: f64 = 56.0;
 
 /// メインディスプレイの上端（または下端）に、全幅でウィンドウを合わせる。
 /// 位置が変わったら true
@@ -103,18 +115,55 @@ pub fn layout(app: &AppHandle) -> bool {
         return false;
     };
     let scale = mon.scale_factor();
-    let wa = mon.work_area();
     let ov = app.state::<Overlay>();
-    let h = (WINDOW_HEIGHT * scale).round() as u32;
-    let y = if ov.bottom.load(Ordering::SeqCst) {
-        wa.position.y + wa.size.height as i32 - h as i32
+    let bottom = ov.bottom.load(Ordering::SeqCst);
+    // タスクバーの代わりにしているときは、ディスプレイ全体を基準にする
+    // （自分で確保した領域の外側に押し出されないように）
+    let (ax, ay, aw, ah) = if ov.full.load(Ordering::SeqCst) {
+        (
+            mon.position().x,
+            mon.position().y,
+            mon.size().width,
+            mon.size().height,
+        )
     } else {
-        wa.position.y
+        let wa = mon.work_area();
+        (wa.position.x, wa.position.y, wa.size.width, wa.size.height)
+    };
+    #[cfg(windows)]
+    {
+        use windows::Win32::Foundation::RECT;
+        let r = if ov.reserve.load(Ordering::SeqCst) {
+            let hp = (RESERVE_HEIGHT * scale).round() as i32;
+            let (top, bot) = if bottom {
+                (ay + ah as i32 - hp, ay + ah as i32)
+            } else {
+                (ay, ay + hp)
+            };
+            Some((
+                bottom,
+                RECT {
+                    left: ax,
+                    top,
+                    right: ax + aw as i32,
+                    bottom: bot,
+                },
+            ))
+        } else {
+            None
+        };
+        crate::tray::reserve(r);
+    }
+    let h = (WINDOW_HEIGHT * scale).round() as u32;
+    let y = if bottom {
+        ay + ah as i32 - h as i32
+    } else {
+        ay
     };
     let next = Geom {
-        x: wa.position.x,
+        x: ax,
         y,
-        w: wa.size.width,
+        w: aw,
         h,
         scale,
     };

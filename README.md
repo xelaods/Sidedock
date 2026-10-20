@@ -8,7 +8,7 @@
 | アドオン | できること |
 | --- | --- |
 | タスクバー | スタートボタンと、開いているアプリのアイコン。クリックで切り替え・最小化、中クリックで新しく開く、右クリックでウィンドウ一覧（閉じるボタン付き） |
-| 通知とトレイ | トレイの隠れたアイコン一覧・クイック設定（Wi-Fi・音量）・通知センターを開く |
+| 通知とトレイ | 他のアプリのトレイアイコン（タスクバーの代わりにしている間）・クイック設定（Wi-Fi・音量）・通知センター |
 | ★ 時計 | 日付と時刻 |
 | ★ 再生中の音楽 | Spotify・Apple Music・YouTube などの曲名とジャケット、再生/一時停止・曲送り・再生位置の変更。カプセルの上でホイールを回すと曲送り |
 | ★ アプリのショートカット | よく使うアプリやフォルダを並べる（ドラッグ＆ドロップでも追加） |
@@ -55,12 +55,15 @@ npm run build    # インストーラーを作る（src-tauri\target\release\bun
 
 ### Windows のタスクバーの代わりに使う
 
-設定の「Windows のタスクバーを隠す」をオンにすると、Windows のタスクバーを隠し、「タスクバー」「通知とトレイ」のアドオンが有効になります。「表示のしかた」を「常に表示」にすると、カプセルがいつも画面上部に出ている状態になります。
+設定の「**タスクバーの代わりにする**」をオンにすると、Windows のタスクバーがなくなり、SideDock が画面の下に常に表示されます（「タスクバー」「通知とトレイ」「時計」のアドオンも有効になります）。
 
-- SideDock を終了すると、タスクバーは元に戻ります
-- スタートメニュー（Win キー）を開いている間は、Windows が自分でタスクバーを出します。閉じると SideDock がまた隠します
-- トレイのアイコンを見たいときは「通知とトレイ」の ∧ を押すと、一時的にタスクバーのトレイ一覧が開きます
+- **トレイアイコン**：他のアプリのトレイアイコンを SideDock が自分で受け取って並べます。クリック・右クリック（メニュー）・ダブルクリックはそのアプリに伝わります。6 個目からは ∧ のパネルに入ります
+- **画面の領域**：最大化したウィンドウが SideDock の下に潜り込まないよう、画面の下を確保します
+- **スタートメニュー**：スタートボタンか Win キーで開きます。開いている間も Windows のタスクバーは出しません
+- SideDock を終了すると、Windows のタスクバーとトレイは元に戻ります
 - もし SideDock が落ちてタスクバーが隠れたままになったら、SideDock をもう一度起動するか、タスクマネージャー（Ctrl+Shift+Esc）で「エクスプローラー」を再起動すると戻ります
+
+しくみ：アプリはトレイアイコンを "Shell_TrayWnd" という名前のウィンドウに登録します。SideDock も同じ名前の見えないウィンドウを作って手前に置き、各アプリに登録し直してもらいます。受け取った内容はエクスプローラーにもそのまま中継するので、SideDock を止めてもトレイは失われません（RetroBar などと同じ方式です）。
 
 ### 軽さのための工夫
 
@@ -127,7 +130,7 @@ my-addon/
 | `system` | `SideDock.system.stats()` で CPU・メモリ・ディスク・バッテリー |
 | `clipboard` | `SideDock.clipboard.list()` / `copy(id)` / `pin(id, true)` / `remove(id)` / `clear()`、`clipboardChanged` イベント |
 | `power` | `SideDock.power.action("lock" \| "sleep" \| "restart" \| "shutdown" \| "signout")` |
-| `windows` | `SideDock.windows.list()` / `icon(id, exe)` / `activate(id)` / `focus(id)` / `close(id)`、`SideDock.shell.action("start" \| "quick" \| "notifications" \| "desktop" \| "tray" \| "taskview")` |
+| `windows` | `SideDock.windows.list()` / `icon(id, exe)` / `activate(id)` / `focus(id)` / `close(id)`、`SideDock.tray.list()` / `click(key, "left" \| "right" \| "double")`、`SideDock.shell.action("start" \| "quick" \| "notifications" \| "desktop" \| "taskview")`、`trayChanged` イベント |
 
 権限がなくても、`SideDock.storage.get()` / `set(data)` でアドオン専用の保存領域（JSON）が使えます。
 
@@ -175,6 +178,7 @@ src-tauri/src/
   sysmon.rs         CPU・メモリ・バッテリー、電源の操作
   clipboard.rs      クリップボードの履歴
   taskbar.rs        ウィンドウの一覧・切り替え、スタートメニュー、タスクバーを隠す
+  tray.rs           トレイアイコンの受け取り・クリックの転送、画面の領域の確保
   log.rs            診断ログ
   system.rs         音量、アプリ起動、アイコン取得、ブラウザ一覧
   addons.rs         アドオンの読み込み、addon:// の配信、保存領域

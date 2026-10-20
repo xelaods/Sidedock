@@ -7,6 +7,7 @@ mod overlay;
 mod sysmon;
 mod system;
 mod taskbar;
+mod tray;
 
 use addons::AddonInfo;
 use config::{AddonEntry, Config};
@@ -41,6 +42,19 @@ struct InitData {
 
 fn main_window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window("main")
+}
+
+/// タスクバーの置き換え・出す端・画面の領域の確保をまとめて反映する
+fn apply_shell(app: &AppHandle, c: &Config) {
+    let replace = c.hide_taskbar;
+    taskbar::set_hidden(replace);
+    tray::enable(app, replace);
+    overlay::configure(
+        app,
+        c.edge == "bottom",
+        replace,
+        replace && c.show == "always",
+    );
 }
 
 /// アドオンを読み直し、設定の並び順に新しいアドオンを足す
@@ -114,8 +128,7 @@ fn init(app: AppHandle) -> InitData {
 fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Result<Config, String> {
     let config = config.sanitize();
     config::save(&app, &config)?;
-    taskbar::set_hidden(config.hide_taskbar);
-    overlay::set_edge(&app, &config.edge);
+    apply_shell(&app, &config);
     *state.config.lock().unwrap() = config.clone();
     let _ = app.emit("config-changed", &config);
     Ok(config)
@@ -338,6 +351,21 @@ fn windows_close(id: i64) {
     taskbar::close(id);
 }
 
+#[tauri::command]
+fn tray_list() -> Vec<tray::TrayIcon> {
+    tray::list()
+}
+
+#[tauri::command]
+fn tray_running() -> bool {
+    tray::running()
+}
+
+#[tauri::command(async)]
+fn tray_click(key: String, button: String) -> Result<(), String> {
+    tray::click(&key, &button)
+}
+
 #[tauri::command(async)]
 fn shell_action(action: String) -> Result<(), String> {
     taskbar::shell(&action)
@@ -457,14 +485,10 @@ pub fn run() {
                 // ふだんはクリックを下のアプリへ素通しする
                 let _ = w.set_ignore_cursor_events(true);
             }
-            // 設定に合わせてタスクバーを隠す（オフなら、前回落ちて隠れたままのものも戻す）
-            let hide_taskbar = handle
-                .state::<AppState>()
-                .config
-                .lock()
-                .unwrap()
-                .hide_taskbar;
-            taskbar::set_hidden(hide_taskbar);
+            // 設定に合わせてタスクバーを置き換え、出す端を決める
+            // （オフなら、前回落ちて隠れたままのタスクバーも元に戻す）
+            let config = handle.state::<AppState>().config.lock().unwrap().clone();
+            apply_shell(&handle, &config);
             overlay::layout(&handle);
             overlay::show(&handle);
             overlay::start(handle);
@@ -510,6 +534,9 @@ pub fn run() {
             windows_focus,
             windows_close,
             shell_action,
+            tray_list,
+            tray_running,
+            tray_click,
             set_low_memory,
         ])
         .build(tauri::generate_context!())
@@ -518,6 +545,7 @@ pub fn run() {
     app.run(|_app, event: RunEvent| {
         // 終了するときは、隠していた Windows のタスクバーを必ず元に戻す
         if let RunEvent::Exit = event {
+            tray::shutdown();
             taskbar::restore();
         }
     });

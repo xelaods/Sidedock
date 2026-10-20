@@ -7,16 +7,28 @@
 <style>
   body { padding: 0 2px; gap: 1px; }
   .sd-bar-btn svg { width: 16px; height: 16px; }
+  #icons { display: flex; gap: 0; }
+  .ti { width: 28px; }
+  .ti img { width: 18px; height: 18px; }
+  .ti-letter { width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; font-size: 9.5px; font-weight: 600; background: var(--sd-surface); color: var(--sd-ink-2); }
+  .ti.enter { animation: pop 0.4s var(--sd-ease); }
+  @keyframes pop { from { transform: scale(0.3); opacity: 0; } }
+  #more { width: 24px; color: var(--sd-ink-2); }
+  #more svg { transition: transform 0.3s var(--sd-ease); }
+  #more:hover svg { transform: translateY(-1.5px); }
+  #more .count { position: absolute; top: 3px; right: 1px; min-width: 12px; height: 12px; padding: 0 3px; border-radius: 6px; font: 600 8.5px/12px var(--sd-font); background: var(--sd-surface); color: var(--sd-ink-2); box-shadow: inset 0 0 0 1px var(--sd-line); }
+  #more .count:empty { display: none; }
   #quick { width: auto; padding: 0 9px; gap: 7px; display: inline-flex; border-radius: 16px; }
   #quick:hover { transform: none; }
-  #tray svg { transition: transform 0.3s var(--sd-ease); }
-  #tray:hover svg { transform: translateY(-1.5px); }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-  <button id="tray" class="sd-bar-btn" aria-label="トレイのアイコン" data-hint="隠れているアイコン">
+  <button id="more" class="sd-bar-btn" aria-label="すべてのトレイアイコン" data-hint="すべてのアイコン" hidden>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+    <span class="count" id="count"></span>
   </button>
+  <div id="icons"></div>
   <button id="quick" class="sd-bar-btn" aria-label="クイック設定" data-hint="Wi-Fi・音量・電源など">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 9a13.5 13.5 0 0 1 18 0M6 12.5a9 9 0 0 1 12 0M9 16a4.5 4.5 0 0 1 6 0"/><circle cx="12" cy="19" r=".9" fill="currentColor"/></svg>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M4 9.5h3l4.5-4v13L7 14.5H4z"/><path d="M15 9a4 4 0 0 1 0 6"/></svg>
@@ -25,10 +37,37 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>
   </button>
 <script type="module">
-  const act = (a) => () => SideDock.shell.action(a).catch(() => {});
-  document.getElementById("tray").addEventListener("click", act("tray"));
-  document.getElementById("quick").addEventListener("click", act("quick"));
-  document.getElementById("notif").addEventListener("click", act("notifications"));
+  import { trayButton, update } from "./common.js";
+  const $ = (id) => document.getElementById(id);
+  // カプセルに並べる数（それ以上は ∧ のパネルへ）
+  const SHOW = 5;
+  const nodes = new Map();
+
+  async function refresh() {
+    const running = await SideDock.tray.running().catch(() => false);
+    const list = running ? await SideDock.tray.list().catch(() => []) : [];
+    const shown = list.slice(0, SHOW);
+    const keys = new Set(shown.map((t) => t.key));
+    for (const [k, b] of nodes) if (!keys.has(k)) { b.remove(); nodes.delete(k); }
+    shown.forEach((t, i) => {
+      let b = nodes.get(t.key);
+      if (!b) {
+        b = trayButton(t);
+        b.classList.add("enter");
+        b.addEventListener("animationend", () => b.classList.remove("enter"), { once: true });
+        nodes.set(t.key, b);
+      } else update(b, t);
+      if ($("icons").children[i] !== b) $("icons").insertBefore(b, $("icons").children[i] ?? null);
+    });
+    $("more").hidden = !running || list.length === 0;
+    $("count").textContent = list.length > SHOW ? `${list.length - SHOW}` : "";
+  }
+
+  $("more").addEventListener("click", () => SideDock.ui.togglePanel());
+  $("quick").addEventListener("click", () => SideDock.shell.action("quick").catch(() => {}));
+  $("notif").addEventListener("click", () => SideDock.shell.action("notifications").catch(() => {}));
+  const poller = SideDock.poll(refresh, { visible: 5000, hidden: 0 });
+  SideDock.on("trayChanged", () => { if (SideDock.visible) poller.now(); });
 </script>
 </body>
 </html>

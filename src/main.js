@@ -694,6 +694,12 @@ const API = {
   "windows.activate": { perm: "windows", run: (f, p) => invoke("windows_activate", { id: Number(p.id) }) },
   "windows.focus": { perm: "windows", run: (f, p) => invoke("windows_focus", { id: Number(p.id) }) },
   "windows.close": { perm: "windows", run: (f, p) => invoke("windows_close", { id: Number(p.id) }) },
+  "tray.list": { perm: "windows", run: () => invoke("tray_list") },
+  "tray.running": { perm: "windows", run: () => invoke("tray_running") },
+  "tray.click": {
+    perm: "windows",
+    run: (f, p) => invoke("tray_click", { key: String(p.key), button: String(p.button ?? "left") }),
+  },
   "shell.action": {
     perm: "windows",
     run: async (f, p) => {
@@ -922,19 +928,20 @@ function renderSettings() {
         applyTheme();
       })),
     row("Windows の起動時に開く", null, autostart),
-    row("Windows のタスクバーを隠す", "SideDock をタスクバーの代わりに使う。終了すると元に戻ります",
-      toggle(c.hideTaskbar, "Windows のタスクバーを隠す", async (v) => {
-        await saveConfig({ hideTaskbar: v });
-        // 隠すときは、タスクバーの代わりになるアドオンも有効にする
+    row("タスクバーの代わりにする", "Windows のタスクバーをなくし、SideDock を画面の下に常に表示します。終了すると元に戻ります",
+      toggle(c.hideTaskbar, "タスクバーの代わりにする", async (v) => {
+        // 置き換えるときは、下に常に表示して、タスクバーの代わりになるアドオンも有効にする
+        const patch = v ? { hideTaskbar: true, edge: "bottom", show: "always" } : { hideTaskbar: false, show: "hover" };
         if (v) {
-          const want = ["sidedock.taskbar", "sidedock.tray"];
-          const addons = state.config.addons.map((a) => (want.includes(a.id) ? { ...a, enabled: true } : a));
-          if (addons.some((a, i) => a.enabled !== state.config.addons[i].enabled)) {
-            await saveConfig({ addons });
-            renderBar();
-            refreshSettings();
-          }
+          const want = ["sidedock.taskbar", "sidedock.tray", "sidedock.clock"];
+          patch.addons = state.config.addons.map((a) => (want.includes(a.id) ? { ...a, enabled: true } : a));
         }
+        await saveConfig(patch);
+        applyEdge();
+        renderBar();
+        if (v) reveal(); else scheduleHide();
+        // 位置などのつまみも合わせて描き直す
+        requestAnimationFrame(() => { renderSettings(); placeDock(); layoutPanel({ morph: false }); });
       })),
   );
 
@@ -948,7 +955,7 @@ function renderSettings() {
   root.replaceChildren(
     el("div", { className: "s-head" },
       el("h2", { className: "s-title", textContent: "SideDock" }),
-      el("span", { className: "s-ver", textContent: "0.4.1" })),
+      el("span", { className: "s-ver", textContent: "0.5.0" })),
     el("div", { className: "s-sec", textContent: "表示" }),
     display,
     el("div", { className: "s-sec", textContent: "アドオン" }),
@@ -1012,6 +1019,7 @@ async function start() {
   // クリップボードの履歴を使うアドオンが有効なら、起動直後から記録を始める
   if (enabledAddons().some((a) => a.permissions.includes("clipboard"))) invoke("clipboard_watch").catch(() => {});
   await listen("clipboard-changed", () => broadcast("clipboardChanged", {}, { permission: "clipboard" }));
+  await listen("tray-changed", () => broadcast("trayChanged", {}, { permission: "windows" }));
 
   await listen("cursor", ({ payload }) => onCursor(payload));
   await listen("suspend", ({ payload }) => onSuspend(!!payload));

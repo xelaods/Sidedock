@@ -24,15 +24,9 @@ pub use win::*;
 #[cfg(windows)]
 mod win {
     use super::WindowInfo;
-    use std::{
-        sync::{
-            atomic::{AtomicBool, AtomicI32, Ordering},
-            Mutex,
-        },
-        time::{Duration, Instant},
-    };
+    use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
     use windows::{
-        core::{w, BOOL, PWSTR},
+        core::{BOOL, PWSTR},
         Win32::{
             Foundation::{CloseHandle, HWND, LPARAM, WPARAM},
             Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED},
@@ -43,11 +37,11 @@ mod win {
             UI::{
                 Input::KeyboardAndMouse::{
                     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
-                    VIRTUAL_KEY, VK_LWIN, VK_MENU, VK_RETURN,
+                    VIRTUAL_KEY, VK_LWIN, VK_MENU,
                 },
                 Shell::{SHAppBarMessage, ABM_GETSTATE, ABM_SETSTATE, ABS_AUTOHIDE, APPBARDATA},
                 WindowsAndMessaging::{
-                    EnumChildWindows, EnumWindows, FindWindowW, GetClassLongPtrW, GetClassNameW,
+                    EnumChildWindows, EnumWindows, GetClassLongPtrW, GetClassNameW,
                     GetForegroundWindow, GetWindow, GetWindowLongW, GetWindowTextLengthW,
                     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
                     PostMessageW, SendMessageTimeoutW, SetForegroundWindow, ShowWindow, GCLP_HICON,
@@ -69,13 +63,13 @@ mod win {
         String::from_utf16_lossy(&buf[..n.max(0) as usize])
     }
 
-    fn pid_of(h: HWND) -> u32 {
+    pub(crate) fn pid_of(h: HWND) -> u32 {
         let mut pid = 0u32;
         unsafe { GetWindowThreadProcessId(h, Some(&mut pid)) };
         pid
     }
 
-    fn exe_of_pid(pid: u32) -> String {
+    pub(crate) fn exe_of_pid(pid: u32) -> String {
         unsafe {
             let Ok(p) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
                 return String::new();
@@ -303,7 +297,7 @@ mod win {
         }
     }
 
-    /// "start" | "quick" | "notifications" | "desktop" | "tray" | "taskview"
+    /// "start" | "quick" | "notifications" | "desktop" | "taskview"
     pub fn shell(action: &str) -> Result<(), String> {
         match action {
             "start" => press(&[VK_LWIN]),
@@ -311,22 +305,8 @@ mod win {
             "notifications" => press(&[VK_LWIN, VIRTUAL_KEY(b'N' as u16)]),
             "desktop" => press(&[VK_LWIN, VIRTUAL_KEY(b'D' as u16)]),
             "taskview" => press(&[VK_LWIN, VIRTUAL_KEY(0x09)]),
-            "tray" => {
-                // 隠しているタスクバーを少しの間だけ出して、トレイの一覧（∧）を開く
-                PEEK_UNTIL
-                    .lock()
-                    .unwrap()
-                    .replace(Instant::now() + Duration::from_secs(4));
-                for t in trays() {
-                    unsafe {
-                        let _ = ShowWindow(t, SW_SHOWNOACTIVATE);
-                    }
-                }
-                std::thread::sleep(Duration::from_millis(120));
-                press(&[VK_LWIN, VIRTUAL_KEY(b'B' as u16)]);
-                std::thread::sleep(Duration::from_millis(60));
-                press(&[VK_RETURN]);
-            }
+            // トレイは SideDock が自分で受け取って表示する（tray.rs）。ここでは何もしない
+            "tray" => {}
             _ => return Err(format!("不明な操作です: {action}")),
         }
         Ok(())
@@ -337,21 +317,26 @@ mod win {
     static HIDE: AtomicBool = AtomicBool::new(false);
     /// 隠す前の「自動的に隠す」の状態（-1 は未保存）
     static PREV_STATE: AtomicI32 = AtomicI32::new(-1);
-    /// トレイを見るために一時的に出している期限
-    static PEEK_UNTIL: Mutex<Option<Instant>> = Mutex::new(None);
-
+    /// エクスプローラーのタスクバー（メインとサブディスプレイ）。
+    /// SideDock 自身も Shell_TrayWnd という名前のウィンドウを持つので、自分のものは除く
     fn trays() -> Vec<HWND> {
+        unsafe extern "system" fn cb(h: HWND, l: LPARAM) -> BOOL {
+            let class = class_name(h);
+            if (class == "Shell_TrayWnd" || class == "Shell_SecondaryTrayWnd")
+                && pid_of(h) != GetCurrentProcessId()
+            {
+                let v = &mut *(l.0 as *mut Vec<HWND>);
+                // メインのタスクバーを先頭に
+                if class == "Shell_TrayWnd" {
+                    v.insert(0, h);
+                } else {
+                    v.push(h);
+                }
+            }
+            true.into()
+        }
         let mut v = Vec::new();
         unsafe {
-            if let Ok(h) = FindWindowW(w!("Shell_TrayWnd"), None) {
-                v.push(h);
-            }
-            unsafe extern "system" fn cb(h: HWND, l: LPARAM) -> BOOL {
-                if class_name(h) == "Shell_SecondaryTrayWnd" {
-                    (*(l.0 as *mut Vec<HWND>)).push(h);
-                }
-                true.into()
-            }
             let _ = EnumWindows(Some(cb), LPARAM(&mut v as *mut Vec<HWND> as isize));
         }
         v
@@ -406,49 +391,10 @@ mod win {
         }
     }
 
-    /// スタートメニューや検索など、タスクバーと一緒に出るシェルの画面が前面にあるか
-    fn shell_ui_in_front() -> bool {
-        let fg = unsafe { GetForegroundWindow() };
-        if fg.is_invalid() {
-            return false;
-        }
-        let class = class_name(fg);
-        if matches!(
-            class.as_str(),
-            "Shell_TrayWnd"
-                | "Shell_SecondaryTrayWnd"
-                | "NotifyIconOverflowWindow"
-                | "TopLevelWindowForOverflowXamlIsland"
-                | "Xaml_WindowedPopupClass"
-        ) {
-            return true;
-        }
-        let exe = exe_of_pid(pid_of(fg)).to_lowercase();
-        [
-            "startmenuexperiencehost.exe",
-            "searchhost.exe",
-            "searchapp.exe",
-            "shellexperiencehost.exe",
-        ]
-        .iter()
-        .any(|e| exe.ends_with(e))
-    }
-
-    /// 定期的に呼ぶ：Windows が勝手にタスクバーを戻したら隠し直す
+    /// 定期的に呼ぶ：Windows が勝手にタスクバーを戻したら隠し直す。
+    /// スタートメニューや検索を開いている間も出さない（タスクバーがなくてもスタートは開く）
     pub fn enforce() {
         if !HIDE.load(Ordering::SeqCst) {
-            return;
-        }
-        {
-            let mut peek = PEEK_UNTIL.lock().unwrap();
-            if let Some(until) = *peek {
-                if Instant::now() < until || shell_ui_in_front() {
-                    return;
-                }
-                *peek = None;
-            }
-        }
-        if shell_ui_in_front() {
             return;
         }
         for t in trays() {
@@ -458,6 +404,7 @@ mod win {
                 }
             }
         }
+        crate::tray::keep_on_top();
     }
 
     /// 終了するときは必ず元に戻す

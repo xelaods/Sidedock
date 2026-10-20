@@ -171,7 +171,7 @@
     get visible() { return visible; },
     poll,
     call,
-    /** イベント：init / theme / panelShown / panelHidden / storageChanged / drop / revealed / concealed / clipboardChanged */
+    /** イベント：init / theme / panelShown / panelHidden / storageChanged / drop / revealed / concealed / clipboardChanged / trayChanged */
     on,
     ui: {
       openPanel: () => call("ui.openPanel"),
@@ -234,6 +234,14 @@
       activate: (id) => call("windows.activate", { id }),
       focus: (id) => call("windows.focus", { id }),
       close: (id) => call("windows.close", { id }),
+    },
+    tray: {
+      /** 他のアプリのトレイアイコン：[{ key, tip, icon, exe }]（タスクバーの代わりにしている間だけ） */
+      list: () => call("tray.list"),
+      /** トレイを受け取っているか */
+      running: () => call("tray.running"),
+      /** "left" | "right" | "double" */
+      click: (key, button = "left") => call("tray.click", { key, button }),
     },
     shell: {
       /** "start" | "quick" | "notifications" | "desktop" | "tray" | "taskview" */
